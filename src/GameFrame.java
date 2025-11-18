@@ -66,10 +66,13 @@ public class GameFrame extends JFrame {
         top.add(pill(blueScore, new Color(133, 171, 236)), BorderLayout.EAST);
 
         // 5) 하단 입력 영역(좌: 노랑 / 우: 파랑) — 동시에 입력 가능
-        JPanel bottom = new JPanel(new GridLayout(1, 2, 8, 8));
+        JPanel bottom = new JPanel(new BorderLayout(8, 8));
         bottom.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
-        bottom.add(teamInputPanel("노랑팀", Team.YELLOW, yellowInput, yellowBtn, new Color(241, 209, 109)));
-        bottom.add(teamInputPanel("파랑팀", Team.BLUE, blueInput, blueBtn, new Color(133, 171, 236)));
+        if (myTeam == Team.YELLOW) {
+            bottom.add(teamInputPanel("노랑팀", Team.YELLOW, yellowInput, yellowBtn, new Color(241, 209, 109)), BorderLayout.CENTER);
+        } else {
+            bottom.add(teamInputPanel("파랑팀", Team.BLUE, blueInput, blueBtn, new Color(133, 171, 236)), BorderLayout.CENTER);
+        }
 
         // 6) 프레임 레이아웃 조립
         setLayout(new BorderLayout(8, 8));
@@ -212,17 +215,17 @@ public class GameFrame extends JFrame {
         if (model.secondsLeft() <= 0) return;
 
         // 모든 클라이언트가 자신의 로컬 모델을 "동일하게" 갱신 (Lock-step)
-        int flipped = model.flipByInput(team, input);
+        java.util.List<GameModel.FlipResult> flips = model.flipByInput(team, input);
 
         // UI 갱신
-        boardPanel.repaint();
+        boardPanel.animateFlips(flips);
         yellowScore.setText(model.count(Team.YELLOW) + "P");
         blueScore.setText(model.count(Team.BLUE) + "P");
 
         // 피드백: "내"가 입력한 것이었다면 입력창 처리
         if (team == myTeam) {
             JTextField myField = (myTeam == Team.YELLOW) ? yellowInput : blueInput;
-            if (flipped == 0) {
+            if (flips.isEmpty()) {
                 myField.selectAll(); // 실패 시 텍스트 선택
             } else {
                 myField.setText(""); // 성공 시 비우기

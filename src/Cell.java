@@ -10,7 +10,7 @@ public class Cell implements Serializable {
     private static final long serialVersionUID = 1L;
     
     private Team owner;
-    private final String token;
+    private String token;
 
     public Cell(Team owner, String token) {
         this.owner = owner;
@@ -22,4 +22,5 @@ public class Cell implements Serializable {
 
     /** 뒤집기(소유권 변경) — 실제 보드 현실 상태를 갱신한다. */
     public void setOwner(Team owner) { this.owner = owner; }
+    public void setToken(String token) { this.token = token; }
 }

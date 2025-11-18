@@ -1,0 +1,59 @@
+# Java compiled files
+*.class
+
+# Log files
+*.log
+
+# BlueJ files
+*.ctxt
+
+# Package files
+*.jar
+*.war
+*.ear
+
+# Virtual machine crash logs
+hs_err_pid*
+
+# Build folders
+/bin/
+/build/
+/target/
+/out/
+
+# Gradle
+.gradle/
+
+# Maven
+target/
+
+# Eclipse
+.project
+.classpath
+.settings/
+
+# IntelliJ IDEA
+/.idea/
+*.iml
+
+# NetBeans
+nbproject/private/
+nbproject/var/
+
+# VS Code
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Other
+*.swp
+*~
+.env
+
+# Ignore compiled native libraries
+*.so
+*.dylib
+*.dll
