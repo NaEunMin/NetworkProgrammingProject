@@ -21,13 +21,16 @@ public class GameModel {
         this.secondsLeft = seconds;
         this.maxFlipPerInput = Math.max(1, maxFlipPerInput);
         this.wordPool = wordPool;
-        recomputeCounts();
+        this.yellowCount = 0;
+        this.blueCount = 0;
     }
 
     public Board board() { return board; }
     public synchronized int secondsLeft() { return secondsLeft; }
     public synchronized void tickOneSecond() { if (secondsLeft > 0) secondsLeft--; }
-    public synchronized int count(Team team) { return (team == Team.YELLOW) ? yellowCount : blueCount; }
+    public synchronized int getScore(Team team) {
+        return (team == Team.YELLOW)? yellowCount : blueCount;
+    }
 
     /**
      * 입력된 단어와 일치하는 상대 칸을 최대 maxFlipPerInput 만큼 뒤집고,
@@ -61,23 +64,16 @@ public class GameModel {
             cell.setToken(newToken);
             results.add(new FlipResult(p, prevOwner, myTeam, oldToken, newToken));
 
+            if(myTeam == Team.YELLOW) {
+                yellowCount += 100;
+            }
+            else {
+                blueCount += 100;
+            }
             flipped++;
         }
 
-        recomputeCounts();
         return results;
-    }
-
-    private void recomputeCounts() {
-        int y = 0, b = 0;
-        for (int r = 0; r < board.rows(); r++) {
-            for (int c = 0; c < board.cols(); c++) {
-                Team t = board.get(r, c).owner();
-                if (t == Team.YELLOW) y++; else b++;
-            }
-        }
-        yellowCount = y;
-        blueCount   = b;
     }
 
     public static record FlipResult(Pos pos, Team from, Team to, String fromToken, String toToken) {}
