@@ -52,6 +52,7 @@ Desktop.ini
 *.swp
 *~
 .env
+GEMINI.md
 
 # Ignore compiled native libraries
 *.so
