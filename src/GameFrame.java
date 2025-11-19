@@ -54,8 +54,8 @@ public class GameFrame extends JFrame {
         // 4) 상단 점수판 + 타이머 (사진 레이아웃을 흉내)
         JPanel top = new JPanel(new BorderLayout(8, 8));
         top.setBorder(BorderFactory.createEmptyBorder(8, 8, 0, 8));
-        yellowScore.setText(model.count(Team.YELLOW) + "P");
-        blueScore.setText(model.count(Team.BLUE) + "P");
+        yellowScore.setText(model.getScore(Team.YELLOW) + "P");
+        blueScore.setText(model.getScore(Team.BLUE) + "P");
 
         timerLabel.setFont(timerLabel.getFont().deriveFont(Font.BOLD, 22f));
         timerLabel.setForeground(Color.WHITE);
@@ -219,8 +219,8 @@ public class GameFrame extends JFrame {
 
         // UI 갱신
         boardPanel.animateFlips(flips);
-        yellowScore.setText(model.count(Team.YELLOW) + "P");
-        blueScore.setText(model.count(Team.BLUE) + "P");
+        yellowScore.setText(model.getScore(Team.YELLOW) + "P");
+        blueScore.setText(model.getScore(Team.BLUE) + "P");
 
         // 피드백: "내"가 입력한 것이었다면 입력창 처리
         if (team == myTeam) {
@@ -240,8 +240,8 @@ public class GameFrame extends JFrame {
         disableInputs();
         
         // 최종 결과 계산 및 표시
-        int y = model.count(Team.YELLOW);
-        int b = model.count(Team.BLUE);
+        int y = model.getScore(Team.YELLOW);
+        int b = model.getScore(Team.BLUE);
         String msg = (y == b) ? "비겼습니다!"
                 : (y > b ? "노랑팀 승리!" : "파랑팀 승리!");
         JOptionPane.showMessageDialog(this, msg + "  (노랑 " + y + " / 파랑 " + b + ")", "게임 종료", JOptionPane.INFORMATION_MESSAGE);
