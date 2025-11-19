@@ -58,3 +58,4 @@ GEMINI.md
 *.so
 *.dylib
 *.dll
+/.metadata/
