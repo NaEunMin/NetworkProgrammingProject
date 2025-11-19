@@ -172,7 +172,13 @@ public class GameRoom {
             gameTimer = null;
         }
         System.out.println("서버: 방[" + roomName + "] 게임 종료.");
+
+        ArrayList<ClientHandler> playersToReset = new ArrayList<>(readyStates.keySet());
+        for(ClientHandler player : playersToReset) {
+            readyStates.put(player, false);
+        }
         broadcast(new NetworkProtocol.Msg_S2C_GameOver());
+        broadcastPlayerList();
         server.broadcastRoomUpdated(this);
     }
 
