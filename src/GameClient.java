@@ -202,9 +202,12 @@ public class GameClient {
                         SwingUtilities.invokeLater(() -> gameFrame.handleRemoteTick());
                     } else if (msg instanceof NetworkProtocol.Msg_S2C_GameOver) {
                         SwingUtilities.invokeLater(() -> gameFrame.handleRemoteGameOver());
-                        Thread.sleep(3000); // 결과 표시 시간
-                        sendMessage(new NetworkProtocol.Msg_C2S_LeaveRoom());
-                        handleReturnToLobby("게임 종료. 로비로 복귀합니다");
+                    } else if (msg instanceof NetworkProtocol.Msg_S2C_BonusTimeStart m){
+                        SwingUtilities.invokeLater(()-> gameFrame.handleBonusTimeStart(m.sentences()));
+                    } else if (msg instanceof NetworkProtocol.Msg_S2C_BonusSentenceResult m){
+                        SwingUtilities.invokeLater(()->gameFrame.handleBonusSentenceResult(m.success(), m.sentence(), m.team()));
+                    } else if (msg instanceof NetworkProtocol.Msg_S2C_BonusTimeEnd){
+                        SwingUtilities.invokeLater(()->gameFrame.handleBonusTimeEnd());
                     }
                 }
             }
@@ -219,6 +222,7 @@ public class GameClient {
             stop();
         }
     }
+    
     
     /** (S2C) 게임 시작 메시지 수신 시 호출 */
     private void initializeGame(Team myTeam, Board board, int seconds) {
@@ -236,12 +240,33 @@ public class GameClient {
                 lobbyFrame.setVisible(false);
             }
             if (waitingRoomFrame != null) {
-                waitingRoomFrame.dispose();
-                waitingRoomFrame = null;
+                waitingRoomFrame.setVisible(false);
             }
             gameFrame = new GameFrame(localModel, this, myTeam);
             gameFrame.setVisible(true);
         });
+    }
+
+    /** (S2C) 게임 종료 -> 대기방 복귀 */
+    private void handleGameFinished(){
+        SwingUtilities.invokeLater(()-> {
+            if(gameFrame != null){
+                gameFrame.dispose();
+                gameFrame = null;
+                localModel = null;
+            }
+            if(waitingRoomFrame != null){
+                waitingRoomFrame.setVisible(true);
+                waitingRoomFrame.appendChat("SYSTEM", "게임이 종료되었습니다. 다시 시작하려면 준비하세요.");
+            }else{
+                //waitingRoomFrame이 없는 비정상적인 경우 로비로 이동
+                handleReturnToLobby("게임 종료. 로비로 복귀합니다.");
+            }
+        });
+    }
+
+    public void gameHasFinished() {
+        handleGameFinished();
     }
     
     /** (S2C) 게임 종료/중단 -> 로비 복귀 */
@@ -318,6 +343,11 @@ public class GameClient {
     /** (C2S) (GameFrame) 게임에서 입력 요청 */
     public void sendInputRequest(Team team, String input) {
         sendMessage(new NetworkProtocol.Msg_C2S_InputRequest(team, input));
+    }
+
+    /** (C2S) (GameFrame) 보너스 타임 문장 입력 요청 */
+    public void sendSentenceInput(Team team, String sentence){
+        sendMessage(new NetworkProtocol.Msg_C2S_SentenceInput(sentence,team));
     }
     
     /** (C2S) (GameFrame) 게임방 나가기(X버튼) */
