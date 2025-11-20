@@ -23,6 +23,12 @@ public class GameServer {
     // 로비에 있는 클라이언트 목록
     private final Set<ClientHandler> lobbyClients = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
+    //보너스 타임 문장 풀
+    private final SentencePool sentencePool;
+
+    public GameServer(){
+        this.sentencePool = SentencePool.fromFile("resources/text.txt");
+    }
     public void start() {
         try (ServerSocket serverSocket = new ServerSocket(PORT)) {
             System.out.println("서버: " + PORT + " 포트에서 클라이언트 대기 중...");
@@ -56,7 +62,7 @@ public class GameServer {
         fillBoardFromFilesOrFallback(board, index);
         GameModel gameModel = new GameModel(board, index, gameTimeSec, 1, WordPool.fromBoard(board));
 
-        GameRoom newRoom = new GameRoom(roomName, password, gameModel, this);
+        GameRoom newRoom = new GameRoom(roomName, password, gameModel, this, sentencePool);
         newRoom.addPlayer(creator, chosenTeam);
         
         activeRooms.put(roomName, newRoom);
@@ -274,6 +280,8 @@ class ClientHandler implements Runnable {
 
                 } else if (msg instanceof NetworkProtocol.Msg_C2S_WaitingChat reqChat) {
                     currentRoom.broadcastWaitingChat(nickname, reqChat.text());
+                } else if (msg instanceof NetworkProtocol.Msg_C2S_SentenceInput req) {
+                    currentRoom.handleSentenceInput(this, req.team(), req.sentence());
                 }
             }
             }

@@ -80,4 +80,19 @@ public class NetworkProtocol {
     
     /** 로비 복귀 (게임 종료 등) */
     public record Msg_S2C_ReturnToLobby() implements Serializable {}
+
+    // -- 보너스 타임 관련 메시지 --
+    /** 보너스 타임 시작 */
+    public record Msg_S2C_BonusTimeStart(List<String> sentences) implements Serializable {}
+
+    /** (클라이언트 -> 서버) 문장 입력 */
+    public record Msg_C2S_SentenceInput(String sentence, Team team) implements Serializable {}
+
+    /** 문장 입력 결과 */
+    public record Msg_S2C_BonusSentenceResult(boolean success, String sentence, Team team) implements Serializable {
+    }
+
+    /** 보너스 타임 종료 */
+    public record Msg_S2C_BonusTimeEnd() implements Serializable {}
+
 }
