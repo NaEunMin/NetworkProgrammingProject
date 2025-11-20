@@ -1,5 +1,8 @@
 import javax.swing.*;
 import java.awt.*;
+import java.io.File;
+import javax.sound.sampled.*;
+import javax.sound.sampled.LineEvent;
 
 /**
  * 메인 프레임: 사진의 화면 구성을 Swing으로 재현.
@@ -195,6 +198,24 @@ public class GameFrame extends JFrame {
         int s = Math.max(0, sec) % 60;
         return String.format("%02d:%02d", m, s);
     }
+    
+    /** (신규) 사운드 재생 헬퍼 */
+    private void playSound(String soundFileName) {
+        new Thread(() -> {
+            try (AudioInputStream audioIn = AudioSystem.getAudioInputStream(new File("resources/sounds/" + soundFileName))) {
+                Clip clip = AudioSystem.getClip();
+                clip.open(audioIn);
+                clip.start();
+                clip.addLineListener(event -> {
+                    if (event.getType() == LineEvent.Type.STOP) {
+                        clip.close();
+                    }
+                });
+            } catch (UnsupportedAudioFileException | java.io.IOException | LineUnavailableException e) {
+                e.printStackTrace();
+            }
+        }).start();
+    }
 
     // --- [신규] 서버 메시지 처리기 (GameClient의 리스너 스레드가 호출) ---
     
@@ -216,6 +237,10 @@ public class GameFrame extends JFrame {
 
         // 모든 클라이언트가 자신의 로컬 모델을 "동일하게" 갱신 (Lock-step)
         java.util.List<GameModel.FlipResult> flips = model.flipByInput(team, input);
+        
+        if (!flips.isEmpty()) {
+            playSound("bell.wav");
+        }
 
         // UI 갱신
         boardPanel.animateFlips(flips);
@@ -237,6 +262,7 @@ public class GameFrame extends JFrame {
      * (신규) 서버로부터 "게임 종료" 메시지를 받았을 때 (EDT에서 호출 보장)
      */
     public void handleRemoteGameOver() {
+        playSound("finish.wav");
         disableInputs();
         
         // 최종 결과 계산 및 표시
