@@ -1,13 +1,10 @@
 import javax.swing.*;
 import java.awt.*;
-<<<<<<< HEAD
 import java.io.File;
 import javax.sound.sampled.*;
 import javax.sound.sampled.LineEvent;
-=======
 import java.util.ArrayList;
 import java.util.List;
->>>>>>> main
 
 /**
  * 메인 프레임: 사진의 화면 구성을 Swing으로 재현.
