@@ -1,8 +1,13 @@
 import javax.swing.*;
 import java.awt.*;
+<<<<<<< HEAD
 import java.io.File;
 import javax.sound.sampled.*;
 import javax.sound.sampled.LineEvent;
+=======
+import java.util.ArrayList;
+import java.util.List;
+>>>>>>> main
 
 /**
  * 메인 프레임: 사진의 화면 구성을 Swing으로 재현.
@@ -32,6 +37,14 @@ public class GameFrame extends JFrame {
 
     // ---- 중앙 보드 ----
     private final BoardPanel boardPanel;
+    private final CardLayout centerCardLayout = new CardLayout();
+    private final JPanel centerPanel = new JPanel(centerCardLayout);
+
+    // ---- 보너스 타임 UI ----
+    private boolean isBonusTime = false;
+    private final JPanel bonusTimePanel = new JPanel();
+    private final JLabel bonusTitle = new JLabel("BONUS TIME!", SwingConstants.CENTER);
+    private final List<JLabel> sentenceLabels = new ArrayList<>();
 
     // ---- 하단 입력(좌/우) ----
     private final JTextField yellowInput = new JTextField(18);
@@ -54,11 +67,34 @@ public class GameFrame extends JFrame {
         // 타이머 초기화 (모델의 시간으로)
         timerLabel.setText(formatSec(model.secondsLeft()));
 
+        // 보너스 타임 패널 설정
+        bonusTimePanel.setLayout(new BoxLayout(bonusTimePanel, BoxLayout.Y_AXIS));
+        bonusTimePanel.setBackground(new Color(19, 36, 49));
+        bonusTimePanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+        bonusTitle.setFont(new Font("Serif", Font.BOLD, 48));
+        bonusTitle.setForeground(Color.ORANGE);
+        bonusTitle.setAlignmentX(Component.CENTER_ALIGNMENT);
+        bonusTimePanel.add(bonusTitle);
+        bonusTimePanel.add(Box.createVerticalStrut(20));
+        for (int i = 0; i < 5; i++) {
+            JLabel sentenceLabel = new JLabel("", SwingConstants.CENTER);
+            sentenceLabel.setFont(new Font("Malgun Gothic", Font.PLAIN, 22));
+            sentenceLabel.setForeground(Color.WHITE);
+            sentenceLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+            sentenceLabels.add(sentenceLabel);
+            bonusTimePanel.add(sentenceLabel);
+            bonusTimePanel.add(Box.createVerticalStrut(10));
+        }
+
+        // 중앙 패널에 카드 레이아웃으로 보드와 보너스 패널 추가
+        centerPanel.add(boardPanel, "board");
+        centerPanel.add(bonusTimePanel, "bonus");
+
         // 4) 상단 점수판 + 타이머 (사진 레이아웃을 흉내)
         JPanel top = new JPanel(new BorderLayout(8, 8));
         top.setBorder(BorderFactory.createEmptyBorder(8, 8, 0, 8));
-        yellowScore.setText(model.count(Team.YELLOW) + "P");
-        blueScore.setText(model.count(Team.BLUE) + "P");
+        yellowScore.setText(model.getScore(Team.YELLOW) + "P");
+        blueScore.setText(model.getScore(Team.BLUE) + "P");
 
         timerLabel.setFont(timerLabel.getFont().deriveFont(Font.BOLD, 22f));
         timerLabel.setForeground(Color.WHITE);
@@ -80,7 +116,7 @@ public class GameFrame extends JFrame {
         // 6) 프레임 레이아웃 조립
         setLayout(new BorderLayout(8, 8));
         add(top, BorderLayout.NORTH);
-        add(boardPanel, BorderLayout.CENTER);
+        add(centerPanel, BorderLayout.CENTER);
         add(bottom, BorderLayout.SOUTH);
 
         // 7) 이벤트 - "내 팀"의 입력만 서버로 전송
@@ -105,6 +141,7 @@ public class GameFrame extends JFrame {
         setLocationRelativeTo(null);
     }
 
+
     /** 사진의 '카드 배지' 느낌을 주기 위한 점수 라벨 스타일 */
     private static JLabel scoreBadge(Color fg) {
         JLabel l = new JLabel("0P", SwingConstants.CENTER);
@@ -122,14 +159,10 @@ public class GameFrame extends JFrame {
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g2.setColor(bg);
                 g2.fillRoundRect(0, 0, getWidth(), getHeight(), 22, 22);
-                // super.paintComponent(g)는 둥근 사각형 위에 컴포넌트를 그리기 위해
-                // 여기서는 호출하지 않거나, setOpaque(false) 후 호출해야 합니다.
-                // 하지만 inner 컴포넌트가 알아서 그려지므로 아래처럼 Opaque(false)만 둡니다.
             }
         };
-        // inner 컴포넌트가 배경을 가리지 않도록 pill 패널 자체는 투명하게
         p.setOpaque(false); 
-        inner.setOpaque(false); // 내부 컴포넌트도 투명해야 배경색이 보임
+        inner.setOpaque(false);
         
         p.setBorder(BorderFactory.createEmptyBorder(8, 14, 8, 14));
         p.add(inner, BorderLayout.CENTER);
@@ -151,14 +184,13 @@ public class GameFrame extends JFrame {
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g2.setColor(tone);
                 g2.fillRoundRect(0, 0, getWidth(), getHeight(), 16, 16);
-                // super.paintComponent(g) 호출 안함 (위와 동일 이유)
             }
         };
-        wrap.setOpaque(false); // 둥근 배경을 위해 패널 자체는 투명하게
+        wrap.setOpaque(false);
         wrap.setBorder(BorderFactory.createEmptyBorder(10, 12, 10, 12));
 
         JPanel row = new JPanel(new BorderLayout(6, 6));
-        row.setOpaque(false); // 내부 패널도 투명하게
+        row.setOpaque(false);
         row.add(field, BorderLayout.CENTER);
         row.add(btn, BorderLayout.EAST);
 
@@ -169,8 +201,6 @@ public class GameFrame extends JFrame {
 
     /**
      * (7) 로컬 입력 처리
-     * - 내 팀이 아니거나 시간이 0이면 무시.
-     * - GameModel을 직접 수정하는 대신, GameClient를 통해 서버로 "입력 요청" 전송.
      */
     private void handleLocalInput(Team team, JTextField field) {
         if (team != myTeam || model.secondsLeft() <= 0) return;
@@ -178,11 +208,11 @@ public class GameFrame extends JFrame {
         String input = field.getText();
         if (input == null || input.isBlank()) return;
 
-        // 서버로 입력 메시지 전송
-        client.sendInputRequest(team, input);
-        
-        // (중요) UI 갱신은 여기서 하지 않음.
-        // 서버가 브로드캐스트하는 "처리 결과"를 받아 갱신 (handleRemoteInput에서)
+        if (isBonusTime) {
+            client.sendSentenceInput(team, input);
+        } else {
+            client.sendInputRequest(team, input);
+        }
     }
 
     /**
@@ -223,9 +253,7 @@ public class GameFrame extends JFrame {
      * (신규) 서버로부터 "시간 1초 경과" 메시지를 받았을 때 (EDT에서 호출 보장)
      */
     public void handleRemoteTick() {
-        // 모델 상태 갱신
         model.tickOneSecond(); 
-        // UI 갱신
         timerLabel.setText(formatSec(model.secondsLeft())); 
     }
 
@@ -235,25 +263,22 @@ public class GameFrame extends JFrame {
     public void handleRemoteInput(Team team, String input) {
         if (model.secondsLeft() <= 0) return;
 
-        // 모든 클라이언트가 자신의 로컬 모델을 "동일하게" 갱신 (Lock-step)
         java.util.List<GameModel.FlipResult> flips = model.flipByInput(team, input);
         
         if (!flips.isEmpty()) {
             playSound("bell.wav");
         }
 
-        // UI 갱신
         boardPanel.animateFlips(flips);
-        yellowScore.setText(model.count(Team.YELLOW) + "P");
-        blueScore.setText(model.count(Team.BLUE) + "P");
+        yellowScore.setText(model.getScore(Team.YELLOW) + "P");
+        blueScore.setText(model.getScore(Team.BLUE) + "P");
 
-        // 피드백: "내"가 입력한 것이었다면 입력창 처리
         if (team == myTeam) {
             JTextField myField = (myTeam == Team.YELLOW) ? yellowInput : blueInput;
             if (flips.isEmpty()) {
-                myField.selectAll(); // 실패 시 텍스트 선택
+                myField.selectAll();
             } else {
-                myField.setText(""); // 성공 시 비우기
+                myField.setText("");
             }
         }
     }
@@ -265,11 +290,80 @@ public class GameFrame extends JFrame {
         playSound("finish.wav");
         disableInputs();
         
-        // 최종 결과 계산 및 표시
-        int y = model.count(Team.YELLOW);
-        int b = model.count(Team.BLUE);
+        int y = model.getScore(Team.YELLOW);
+        int b = model.getScore(Team.BLUE);
         String msg = (y == b) ? "비겼습니다!"
                 : (y > b ? "노랑팀 승리!" : "파랑팀 승리!");
         JOptionPane.showMessageDialog(this, msg + "  (노랑 " + y + " / 파랑 " + b + ")", "게임 종료", JOptionPane.INFORMATION_MESSAGE);
+        client.gameHasFinished();
+    }
+
+    // --- [추가] 보너스 타임 관련 서버 메시지 처리기 ---
+
+    /**
+     * (신규) 서버로부터 "보너스 타임 시작" 메시지를 받았을 때
+     */
+    public void handleBonusTimeStart(java.util.List<String> sentences) {
+        isBonusTime = true;
+        
+        for (int i = 0; i < sentenceLabels.size(); i++) {
+            if (i < sentences.size()) {
+                sentenceLabels.get(i).setText(sentences.get(i));
+                sentenceLabels.get(i).setForeground(Color.WHITE);
+                java.util.Map<java.awt.font.TextAttribute, Object> attributes = new java.util.HashMap<>();
+                attributes.put(java.awt.font.TextAttribute.STRIKETHROUGH, false);
+                sentenceLabels.get(i).setFont(sentenceLabels.get(i).getFont().deriveFont(attributes));
+            }
+        }
+        
+        centerCardLayout.show(centerPanel, "bonus");
+        
+        JOptionPane.showMessageDialog(this, "BONUS TIME! 20초간 문장을 입력하여 500점을 획득하세요!", "보너스 타임!", JOptionPane.INFORMATION_MESSAGE);
+        
+        if (myTeam == Team.YELLOW) {
+            yellowInput.requestFocusInWindow();
+        } else {
+            blueInput.requestFocusInWindow();
+        }
+    }
+
+    /**
+     * (신규) 서버로부터 "문장 입력 결과" 메시지를 받았을 때
+     */
+    public void handleBonusSentenceResult(boolean success, String sentence, Team team) {
+        if (!isBonusTime) return;
+
+        if (success) {
+            model.addScore(team, 500);
+            yellowScore.setText(model.getScore(Team.YELLOW) + "P");
+            blueScore.setText(model.getScore(Team.BLUE) + "P");
+        }
+
+        for (JLabel label : sentenceLabels) {
+            if (label.getText().equals(sentence)) {
+                if (success) {
+                    label.setForeground(team == Team.YELLOW ? new Color(0xF2, 0xC1, 0x4E) : new Color(0x5D, 0xA3, 0xFA));
+                    
+                    java.util.Map<java.awt.font.TextAttribute, Object> attributes = new java.util.HashMap<>();
+                    attributes.put(java.awt.font.TextAttribute.STRIKETHROUGH, java.awt.font.TextAttribute.STRIKETHROUGH_ON);
+                    label.setFont(label.getFont().deriveFont(attributes));
+
+                    if (team == myTeam) {
+                        if (myTeam == Team.YELLOW) yellowInput.setText("");
+                        else blueInput.setText("");
+                    }
+                }
+                break;
+            }
+        }
+    }
+
+    /**
+     * (신규) 서버로부터 "보너스 타임 종료" 메시지를 받았을 때
+     */
+    public void handleBonusTimeEnd() {
+        isBonusTime = false;
+        centerCardLayout.show(centerPanel, "board");
+        JOptionPane.showMessageDialog(this, "보너스 타임 종료!", "알림", JOptionPane.INFORMATION_MESSAGE);
     }
 }

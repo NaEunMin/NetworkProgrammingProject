@@ -1,5 +1,7 @@
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -12,6 +14,7 @@ public class GameRoom {
     private final String password;
     private final GameModel gameModel;
     private final GameServer server;
+    private final SentencePool sentencePool;
     private final int maxPlayers = 2;
 
     private ClientHandler playerYellow;
@@ -21,12 +24,19 @@ public class GameRoom {
     
     private boolean isPlaying = false;
     private Timer gameTimer;
+    private int initialGameTime;
 
-    public GameRoom(String roomName, String password, GameModel gameModel, GameServer server) {
+    private boolean isBonusTime = false;
+    private boolean bonusTimeActivated = false;
+    private Timer bonusTimer;
+    private List<String> bonusSentences = Collections.synchronizedList(new ArrayList<>());
+
+    public GameRoom(String roomName, String password, GameModel gameModel, GameServer server, SentencePool sentencePool) {
         this.roomName = roomName;
         this.password = password;
         this.gameModel = gameModel;
         this.server = server;
+        this.sentencePool = sentencePool;
     }
 
     public String getRoomName() { return roomName; }
@@ -136,23 +146,34 @@ public class GameRoom {
         }
         
         isPlaying = true;
+        bonusTimeActivated = false;
+        this.initialGameTime = gameModel.secondsLeft(); //초기 게임 시간 저장
         System.out.println("서버: 방[" + roomName + "] 게임 시작.");
 
         // 양쪽 클라이언트에게 게임 시작 알림 송신
         Board board = gameModel.board();
-        int seconds = gameModel.secondsLeft();
         
-        playerYellow.sendMessage(new NetworkProtocol.Msg_S2C_GameStart(Team.YELLOW, board, seconds));
-        playerBlue.sendMessage(new NetworkProtocol.Msg_S2C_GameStart(Team.BLUE, board, seconds));
+        playerYellow.sendMessage(new NetworkProtocol.Msg_S2C_GameStart(Team.YELLOW, board, initialGameTime));
+        playerBlue.sendMessage(new NetworkProtocol.Msg_S2C_GameStart(Team.BLUE, board, initialGameTime));
 
         // 서버 타이머 시작
         gameTimer = new Timer();
         gameTimer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
+                synchronized(GameRoom.this){
+                    if(!isPlaying){
+                        this.cancel();
+                        return;
+                    }
+                }
                 gameModel.tickOneSecond();
                 broadcast(new NetworkProtocol.Msg_S2C_Tick());
 
+                if(!isBonusTime && !bonusTimeActivated && gameModel.secondsLeft() > 0 && gameModel.secondsLeft() <= initialGameTime /2){
+                    bonusTimeActivated = true;
+                    startBonusTime();
+                }
                 if (gameModel.secondsLeft() <= 0) {
                     stopGame(); // 시간 종료
                 }
@@ -171,8 +192,17 @@ public class GameRoom {
             gameTimer.cancel();
             gameTimer = null;
         }
+        if(isBonusTime){
+            endBonusTime();
+        }
         System.out.println("서버: 방[" + roomName + "] 게임 종료.");
+
+        ArrayList<ClientHandler> playersToReset = new ArrayList<>(readyStates.keySet());
+        for(ClientHandler player : playersToReset) {
+            readyStates.put(player, false);
+        }
         broadcast(new NetworkProtocol.Msg_S2C_GameOver());
+        broadcastPlayerList();
         server.broadcastRoomUpdated(this);
     }
 
@@ -201,7 +231,7 @@ public class GameRoom {
     
     /** 클라이언트의 입력 요청 처리 */
     public synchronized void handleInput(ClientHandler player, Team team, String input) {
-        if (!isPlaying) return;
+        if (!isPlaying || isBonusTime) return;
         
         // (중요) 서버의 GameModel을 먼저 업데이트
         var flips = gameModel.flipByInput(team, input);
@@ -215,5 +245,54 @@ public class GameRoom {
     /** 대기방 채팅 브로드캐스트 */
     public synchronized void broadcastWaitingChat(String sender, String text) {
         broadcast(new NetworkProtocol.Msg_S2C_WaitingChat(sender, text));
+    }
+
+
+    //=== 보너스 타임 관련 메서드
+    public synchronized void startBonusTime(){
+        if(isBonusTime || !isPlaying) return;
+        isBonusTime = true;
+        bonusSentences.clear();
+        bonusSentences.addAll(sentencePool.getRandomSentences(5));
+
+        System.out.println("서버: 방[" + roomName + "] 보너스 타임 시작!");
+        broadcast(new NetworkProtocol.Msg_S2C_BonusTimeStart(new ArrayList<>(bonusSentences)));
+
+        //20초 후 보너스 타임 종료
+        bonusTimer = new Timer();
+        bonusTimer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                endBonusTime();
+            }
+        }, 20000);
+    }
+
+    public synchronized void endBonusTime(){
+        if(!isBonusTime) return;
+        if(bonusTimer != null){
+            bonusTimer.cancel();
+            bonusTimer = null;
+        }
+        isBonusTime = false;
+        bonusSentences.clear();
+
+        System.out.println("서버: 방[" + roomName + "] 보너스 타임 종료!");
+        broadcast(new NetworkProtocol.Msg_S2C_BonusTimeEnd());
+    }
+
+    public synchronized void handleSentenceInput(ClientHandler player, Team team, String sentence){
+        if(!isBonusTime || !isPlaying) return;
+
+        boolean success = false;
+
+        if(bonusSentences.remove(sentence)){
+            gameModel.addScore(team,500);
+            success = true;
+            System.out.println("서버: 방[" + roomName + "] " + team + "팀이 문장 맞춤! +500점");
+        }
+
+        //모든 클라이언트에게 결과 브로드캐스트
+        broadcast(new NetworkProtocol.Msg_S2C_BonusSentenceResult(success,sentence,team));
     }
 }
