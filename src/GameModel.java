@@ -31,6 +31,14 @@ public class GameModel {
     public synchronized int getScore(Team team) {
         return (team == Team.YELLOW)? yellowCount : blueCount;
     }
+    public synchronized void addScore(Team team, int score){
+        if(team == Team.YELLOW){
+            yellowCount += score;
+        }
+        else {
+            blueCount += score;
+        }
+    }
 
     /**
      * 입력된 단어와 일치하는 상대 칸을 최대 maxFlipPerInput 만큼 뒤집고,
