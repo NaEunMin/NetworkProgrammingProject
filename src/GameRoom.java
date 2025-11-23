@@ -12,7 +12,8 @@ public class GameRoom {
     
     private final String roomName;
     private final String password;
-    private final GameModel gameModel;
+    private GameModel gameModel; // [MODIFIED] non-final for reset
+    private final int durationSec; // [NEW]
     private final GameServer server;
     private final SentencePool sentencePool;
     private final int maxPlayers = 2;
@@ -35,6 +36,7 @@ public class GameRoom {
         this.roomName = roomName;
         this.password = password;
         this.gameModel = gameModel;
+        this.durationSec = gameModel.secondsLeft(); // [NEW]
         this.server = server;
         this.sentencePool = sentencePool;
     }
@@ -147,6 +149,10 @@ public class GameRoom {
         
         isPlaying = true;
         bonusTimeActivated = false;
+        
+        // [NEW] 게임 시작 시 새로운 모델 생성 (시간/보드 리셋)
+        this.gameModel = server.createGameModel(durationSec);
+        
         this.initialGameTime = gameModel.secondsLeft(); //초기 게임 시간 저장
         System.out.println("서버: 방[" + roomName + "] 게임 시작.");
 

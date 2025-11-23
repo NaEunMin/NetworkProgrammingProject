@@ -57,10 +57,8 @@ public class GameServer {
 
         System.out.println("서버: " + creator.getNickname() + "이(가) 방 생성 시도: [" + roomName + "]");
         
-        Board board = new Board(ROWS, COLS);
-        TokenIndex index = new TokenIndex();
-        fillBoardFromFilesOrFallback(board, index);
-        GameModel gameModel = new GameModel(board, index, gameTimeSec, 1, WordPool.fromBoard(board));
+        // [MODIFIED] Use createGameModel
+        GameModel gameModel = createGameModel(gameTimeSec);
 
         GameRoom newRoom = new GameRoom(roomName, password, gameModel, this, sentencePool);
         newRoom.addPlayer(creator, chosenTeam);
@@ -69,6 +67,14 @@ public class GameServer {
         
         sendEnterWaitingRoom(creator, newRoom, chosenTeam);
         broadcastRoomUpdated(newRoom);
+    }
+
+    /** [NEW] 새로운 게임 모델 생성 (보드 리셋 포함) */
+    public GameModel createGameModel(int gameTimeSec) {
+        Board board = new Board(ROWS, COLS);
+        TokenIndex index = new TokenIndex();
+        fillBoardFromFilesOrFallback(board, index);
+        return new GameModel(board, index, gameTimeSec, 1, WordPool.fromBoard(board));
     }
 
     /** 클라이언트의 방 참여 요청 처리 */
