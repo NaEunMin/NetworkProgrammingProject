@@ -25,7 +25,7 @@ public class GameFrame extends JFrame {
 
     // ---- 모델/네트워크 ----
     private final GameModel model;
-    private final GameClient client; // 서버와 통신할 클라이언트
+    private final IGameClient client; // 서버와 통신할 클라이언트 (또는 로컬 매니저)
     private final Team myTeam;       // 이 프레임의 플레이어 팀 (YELLOW or BLUE)
 
     // ---- UI 구성요소(상단) ----
@@ -59,7 +59,7 @@ public class GameFrame extends JFrame {
      * 생성자:
      * 모델, 클라이언트, 내 팀을 외부(GameClient)에서 주입받음.
      */
-    public GameFrame(GameModel model, GameClient client, Team myTeam, String yellowPlayerName, String bluePlayerName) {
+    public GameFrame(GameModel model, IGameClient client, Team myTeam, String yellowPlayerName, String bluePlayerName) {
         super("판 뒤집기 (1:1 · 실시간 · Swing) - " + myTeam + "팀");
 
         this.model = model;
@@ -67,7 +67,7 @@ public class GameFrame extends JFrame {
         this.myTeam = myTeam;
         this.yellowPlayerName = yellowPlayerName;
         this.bluePlayerName = bluePlayerName;
-        this.backgroundImage = loadImage("resources/images/game_background.png");
+        this.backgroundImage = loadImage("resources/images/game_background_pirate.png");
         this.boardPanel = new BoardPanel(model);
         
         // 타이머 초기화 (모델의 시간으로)
@@ -127,8 +127,8 @@ public class GameFrame extends JFrame {
         bottom.add(inputPanel);
         refreshFlipLabels();
 
-        ImageIcon yellowTeamIcon = loadScaledIcon("resources/images/yellow_team.png", 140, 180);
-        ImageIcon blueTeamIcon = loadScaledIcon("resources/images/blue_team.png", 140, 180);
+        ImageIcon yellowTeamIcon = loadScaledIcon("resources/images/yellow_team_pirate.png", 140, 180);
+        ImageIcon blueTeamIcon = loadScaledIcon("resources/images/blue_team_pirate.png", 140, 180);
 
         // 6) 프레임 레이아웃 조립
         JPanel middle = new JPanel(new BorderLayout(8, 0));

@@ -23,6 +23,8 @@ public class WaitingRoomFrame extends JFrame {
     private JTextArea chatArea;
     private JTextField chatInput;
 
+    private Image backgroundImage;
+
     public WaitingRoomFrame(GameClient client, NetworkProtocol.RoomInfo roomInfo, List<NetworkProtocol.PlayerInfo> players, Team myTeam) {
         super("대기방 - " + roomInfo.name());
         this.client = client;
@@ -32,6 +34,14 @@ public class WaitingRoomFrame extends JFrame {
         setSize(920, 620);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
+        
+        // 이미지 로드
+        try {
+            backgroundImage = new ImageIcon("resources/images/waiting_room_background_pirate.png").getImage();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
         addWindowListener(new java.awt.event.WindowAdapter() {
             @Override
             public void windowClosing(java.awt.event.WindowEvent e) {
@@ -44,9 +54,17 @@ public class WaitingRoomFrame extends JFrame {
     }
 
     private JPanel buildContent() {
-        JPanel root = new JPanel(new BorderLayout(12, 12));
+        JPanel root = new JPanel(new BorderLayout(12, 12)) {
+             @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                if (backgroundImage != null) {
+                    g.drawImage(backgroundImage, 0, 0, getWidth(), getHeight(), this);
+                }
+            }
+        };
         root.setBorder(new EmptyBorder(12, 12, 12, 12));
-        root.setBackground(new Color(19, 44, 68));
+        // root.setBackground(new Color(19, 44, 68)); // 이미지 사용
 
         root.add(buildInfoPanel(), BorderLayout.WEST);
         root.add(buildCenterPanel(), BorderLayout.CENTER);
@@ -59,7 +77,7 @@ public class WaitingRoomFrame extends JFrame {
         JPanel info = new JPanel();
         info.setLayout(new BoxLayout(info, BoxLayout.Y_AXIS));
         info.setPreferredSize(new Dimension(220, 0));
-        info.setBackground(new Color(26, 52, 78));
+        info.setBackground(new Color(26, 52, 78, 200)); // 반투명
         info.setBorder(new EmptyBorder(16, 16, 16, 16));
 
         roomNameLabel = new JLabel(roomInfo.name());
@@ -114,7 +132,7 @@ public class WaitingRoomFrame extends JFrame {
 
     private JPanel wrapSlot(String title, JLabel slot, Color headerColor) {
         JPanel panel = new JPanel(new BorderLayout());
-        panel.setBackground(new Color(30, 58, 88));
+        panel.setBackground(new Color(30, 58, 88, 200)); // 반투명
         panel.setBorder(new EmptyBorder(10, 10, 10, 10));
 
         JLabel header = new JLabel(title);
@@ -135,7 +153,7 @@ public class WaitingRoomFrame extends JFrame {
         label.setForeground(Color.WHITE);
         label.setFont(label.getFont().deriveFont(Font.BOLD, 16f));
         label.setOpaque(true);
-        label.setBackground(new Color(38, 78, 120));
+        label.setBackground(new Color(38, 78, 120, 200)); // 반투명
         label.setBorder(new EmptyBorder(32, 8, 32, 8));
         return label;
     }
@@ -143,7 +161,7 @@ public class WaitingRoomFrame extends JFrame {
     private JPanel buildChatPanel() {
         JPanel chatPanel = new JPanel(new BorderLayout(8, 8));
         chatPanel.setPreferredSize(new Dimension(260, 0));
-        chatPanel.setBackground(new Color(26, 52, 78));
+        chatPanel.setBackground(new Color(26, 52, 78, 200)); // 반투명
         chatPanel.setBorder(new EmptyBorder(10, 10, 10, 10));
 
         JLabel chatTitle = new JLabel("채팅");
