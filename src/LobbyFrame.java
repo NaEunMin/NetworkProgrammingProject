@@ -14,6 +14,8 @@ public class LobbyFrame extends JFrame {
     private DefaultListModel<NetworkProtocol.RoomInfo> roomListModel;
     private JList<NetworkProtocol.RoomInfo> roomList;
 
+    private Image backgroundImage;
+
     public LobbyFrame(GameClient client, String nickname) {
         super("판 뒤집기 - 로비");
         this.client = client;
@@ -23,10 +25,25 @@ public class LobbyFrame extends JFrame {
         setSize(900, 560);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
+        
+        // 이미지 로드
+        try {
+            backgroundImage = new ImageIcon("resources/images/lobby_background_pirate.png").getImage();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
 
-        JPanel content = new JPanel(new BorderLayout(12, 12));
+        JPanel content = new JPanel(new BorderLayout(12, 12)) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                if (backgroundImage != null) {
+                    g.drawImage(backgroundImage, 0, 0, getWidth(), getHeight(), this);
+                }
+            }
+        };
         content.setBorder(new EmptyBorder(12, 12, 12, 12));
-        content.setBackground(new Color(14, 32, 52));
+        // content.setBackground(new Color(14, 32, 52)); // 이미지 사용하므로 배경색 제거
         setContentPane(content);
 
         content.add(buildProfilePanel(), BorderLayout.WEST);
@@ -45,7 +62,7 @@ public class LobbyFrame extends JFrame {
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
         panel.setPreferredSize(new Dimension(220, 0));
         panel.setOpaque(true);
-        panel.setBackground(new Color(26, 52, 78));
+        panel.setBackground(new Color(26, 52, 78, 200)); // 반투명
         panel.setBorder(new EmptyBorder(20, 16, 20, 16));
 
         JLabel avatar = new JLabel(createAvatarIcon(96));
@@ -84,7 +101,7 @@ public class LobbyFrame extends JFrame {
     private JPanel buildLobbyPanel() {
         JPanel panel = new JPanel(new BorderLayout(10, 10));
         panel.setOpaque(true);
-        panel.setBackground(new Color(19, 44, 68));
+        panel.setBackground(new Color(19, 44, 68, 200)); // 반투명
         panel.setBorder(new EmptyBorder(12, 12, 12, 12));
 
         JLabel title = new JLabel("게임 로비");
@@ -133,8 +150,23 @@ public class LobbyFrame extends JFrame {
         buttonPanel.setOpaque(false);
         JButton createRoomBtn = new JButton("방 만들기");
         JButton joinRoomBtn = new JButton("방 참여");
+        JButton singlePlayBtn = new JButton("싱글 플레이"); // [NEW]
+
+        buttonPanel.add(singlePlayBtn);
         buttonPanel.add(createRoomBtn);
         buttonPanel.add(joinRoomBtn);
+
+        singlePlayBtn.addActionListener(e -> {
+            // 난이도 선택 다이얼로그
+            String[] options = {"쉬움", "보통", "어려움"};
+            int choice = JOptionPane.showOptionDialog(this, "난이도를 선택하세요", "싱글 플레이",
+                    JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE, null, options, options[0]);
+            
+            if (choice >= 0) {
+                SingleGameManager.Difficulty diff = SingleGameManager.Difficulty.values()[choice];
+                new SingleGameManager(this, nickname, diff).start();
+            }
+        });
 
         createRoomBtn.addActionListener(e -> {
             CreateRoomDialog dialog = new CreateRoomDialog(this, client);

@@ -16,7 +16,7 @@ import java.net.SocketException;
  * 3. 서버로부터 GameStart 메시지를 받으면 LobbyFrame을 숨기고 GameFrame을 연다.
  * 4. 게임 종료/중단 시 GameFrame을 닫고 LobbyFrame/대기방으로 복귀.
  */
-public class GameClient {
+public class GameClient implements IGameClient {
 
     private static final int PORT = 12345;
 
@@ -34,7 +34,7 @@ public class GameClient {
     private java.util.List<NetworkProtocol.PlayerInfo> currentPlayers = new java.util.ArrayList<>();
 
     public void start() {
-        String imagePath = "resources/images/login_background.png";
+        String imagePath = "resources/images/login_background_pirate.png";
         String ip = null;
         try {
             Dimension screen = Toolkit.getDefaultToolkit().getScreenSize();
