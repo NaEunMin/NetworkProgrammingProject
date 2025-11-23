@@ -11,6 +11,8 @@ public class GameModel {
 
     private int yellowCount;
     private int blueCount;
+    private int yellowFlips;
+    private int blueFlips;
 
     private int secondsLeft;
     private final int maxFlipPerInput;
@@ -23,6 +25,8 @@ public class GameModel {
         this.wordPool = wordPool;
         this.yellowCount = 0;
         this.blueCount = 0;
+        this.yellowFlips = 0;
+        this.blueFlips = 0;
     }
 
     public Board board() { return board; }
@@ -30,6 +34,9 @@ public class GameModel {
     public synchronized void tickOneSecond() { if (secondsLeft > 0) secondsLeft--; }
     public synchronized int getScore(Team team) {
         return (team == Team.YELLOW)? yellowCount : blueCount;
+    }
+    public synchronized int getFlips(Team team) {
+        return (team == Team.YELLOW)? yellowFlips : blueFlips;
     }
     public synchronized void addScore(Team team, int score){
         if(team == Team.YELLOW){
@@ -74,9 +81,11 @@ public class GameModel {
 
             if(myTeam == Team.YELLOW) {
                 yellowCount += 100;
+                yellowFlips++;
             }
             else {
                 blueCount += 100;
+                blueFlips++;
             }
             flipped++;
         }

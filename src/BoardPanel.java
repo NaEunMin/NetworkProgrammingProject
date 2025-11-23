@@ -21,7 +21,7 @@ public class BoardPanel extends JPanel {
     public BoardPanel(GameModel model) {
         this.model = model;
         setBackground(new Color(19, 36, 49));
-        setOpaque(true);
+        setOpaque(false);
 
         javax.swing.Timer t = new javax.swing.Timer(16, e -> {
             if (animations.isEmpty()) {

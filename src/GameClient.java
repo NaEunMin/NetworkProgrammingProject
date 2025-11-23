@@ -31,6 +31,7 @@ public class GameClient {
     private GameFrame gameFrame;          // 실제 게임 UI
     
     private GameModel localModel;         // 서버와 동기화될 로컬 모델
+    private java.util.List<NetworkProtocol.PlayerInfo> currentPlayers = new java.util.ArrayList<>();
 
     public void start() {
         String imagePath = "resources/images/login_background.png";
@@ -173,8 +174,10 @@ public class GameClient {
                 } else if (msg instanceof NetworkProtocol.Msg_S2C_RoomRemoved m) {
                     SwingUtilities.invokeLater(() -> lobbyFrame.removeRoom(m.roomName()));
                 } else if (msg instanceof NetworkProtocol.Msg_S2C_EnterWaitingRoom m) {
+                    setCurrentPlayers(m.players());
                     SwingUtilities.invokeLater(() -> openWaitingRoom(m.room(), m.players(), m.myTeam()));
                 } else if (msg instanceof NetworkProtocol.Msg_S2C_PlayerListUpdated m) {
+                    setCurrentPlayers(m.players());
                     SwingUtilities.invokeLater(() -> {
                         if (waitingRoomFrame != null) waitingRoomFrame.updatePlayers(m.players());
                     });
@@ -234,6 +237,8 @@ public class GameClient {
             }
         }
         localModel = new GameModel(board, localIndex, seconds, 1, WordPool.fromBoard(board));
+        String yellowName = findPlayerName(Team.YELLOW, myTeam);
+        String blueName = findPlayerName(Team.BLUE, myTeam);
 
         SwingUtilities.invokeLater(() -> {
             if (lobbyFrame != null) {
@@ -242,7 +247,7 @@ public class GameClient {
             if (waitingRoomFrame != null) {
                 waitingRoomFrame.setVisible(false);
             }
-            gameFrame = new GameFrame(localModel, this, myTeam);
+            gameFrame = new GameFrame(localModel, this, myTeam, yellowName, blueName);
             gameFrame.setVisible(true);
         });
     }
@@ -285,6 +290,7 @@ public class GameClient {
                 lobbyFrame.setVisible(true);
                 lobbyFrame.setStatus(message, Color.WHITE);
             }
+            clearCurrentPlayers();
         });
     }
 
@@ -368,8 +374,27 @@ public class GameClient {
         if (waitingRoomFrame != null) {
             waitingRoomFrame.dispose();
         }
+        setCurrentPlayers(players);
         waitingRoomFrame = new WaitingRoomFrame(this, roomInfo, players, myTeam);
         waitingRoomFrame.setVisible(true);
+    }
+
+    private synchronized void setCurrentPlayers(java.util.List<NetworkProtocol.PlayerInfo> players){
+        this.currentPlayers = new java.util.ArrayList<>(players);
+    }
+
+    private synchronized void clearCurrentPlayers(){
+        this.currentPlayers = new java.util.ArrayList<>();
+    }
+
+    private synchronized String findPlayerName(Team team, Team myAssignedTeam){
+        for (NetworkProtocol.PlayerInfo p : currentPlayers) {
+            if (p.team() == team) {
+                return p.nickname();
+            }
+        }
+        if (team == myAssignedTeam) return nickname;
+        return (team == Team.YELLOW) ? "노랑팀" : "파랑팀";
     }
 
     /** (종료) */

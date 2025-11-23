@@ -1,6 +1,7 @@
 import javax.swing.*;
 import java.awt.*;
 import java.io.File;
+import javax.imageio.ImageIO;
 import javax.sound.sampled.*;
 import javax.sound.sampled.LineEvent;
 import java.util.ArrayList;
@@ -31,6 +32,9 @@ public class GameFrame extends JFrame {
     private final JLabel yellowScore = scoreBadge(new Color(0xF2, 0xC1, 0x4E));
     private final JLabel blueScore = scoreBadge(new Color(0x5D, 0xA3, 0xFA));
     private final JLabel timerLabel = new JLabel("01:00", SwingConstants.CENTER);
+    private final String yellowPlayerName;
+    private final String bluePlayerName;
+    private final Image backgroundImage;
 
     // ---- 중앙 보드 ----
     private final BoardPanel boardPanel;
@@ -48,17 +52,22 @@ public class GameFrame extends JFrame {
     private final JButton yellowBtn = new JButton("입력하기");
     private final JTextField blueInput = new JTextField(18);
     private final JButton blueBtn = new JButton("입력하기");
+    private final JLabel yellowFlipLabel = flipCounterLabel();
+    private final JLabel blueFlipLabel = flipCounterLabel();
 
     /**
      * 생성자:
      * 모델, 클라이언트, 내 팀을 외부(GameClient)에서 주입받음.
      */
-    public GameFrame(GameModel model, GameClient client, Team myTeam) {
+    public GameFrame(GameModel model, GameClient client, Team myTeam, String yellowPlayerName, String bluePlayerName) {
         super("판 뒤집기 (1:1 · 실시간 · Swing) - " + myTeam + "팀");
 
         this.model = model;
         this.client = client;
         this.myTeam = myTeam;
+        this.yellowPlayerName = yellowPlayerName;
+        this.bluePlayerName = bluePlayerName;
+        this.backgroundImage = loadImage("resources/images/game_background.png");
         this.boardPanel = new BoardPanel(model);
         
         // 타이머 초기화 (모델의 시간으로)
@@ -86,9 +95,11 @@ public class GameFrame extends JFrame {
         // 중앙 패널에 카드 레이아웃으로 보드와 보너스 패널 추가
         centerPanel.add(boardPanel, "board");
         centerPanel.add(bonusTimePanel, "bonus");
+        centerPanel.setOpaque(false);
 
         // 4) 상단 점수판 + 타이머 (사진 레이아웃을 흉내)
         JPanel top = new JPanel(new BorderLayout(8, 8));
+        top.setOpaque(false);
         top.setBorder(BorderFactory.createEmptyBorder(8, 8, 0, 8));
         yellowScore.setText(model.getScore(Team.YELLOW) + "P");
         blueScore.setText(model.getScore(Team.BLUE) + "P");
@@ -102,19 +113,48 @@ public class GameFrame extends JFrame {
         top.add(pill(blueScore, new Color(133, 171, 236)), BorderLayout.EAST);
 
         // 5) 하단 입력 영역(좌: 노랑 / 우: 파랑) — 동시에 입력 가능
-        JPanel bottom = new JPanel(new BorderLayout(8, 8));
+        JPanel bottom = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 8));
+        bottom.setOpaque(false);
         bottom.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
+        JPanel inputPanel;
         if (myTeam == Team.YELLOW) {
-            bottom.add(teamInputPanel("노랑팀", Team.YELLOW, yellowInput, yellowBtn, new Color(241, 209, 109)), BorderLayout.CENTER);
+            inputPanel = teamInputPanel("노랑팀", Team.YELLOW, yellowInput, yellowBtn, yellowFlipLabel, new Color(241, 209, 109));
         } else {
-            bottom.add(teamInputPanel("파랑팀", Team.BLUE, blueInput, blueBtn, new Color(133, 171, 236)), BorderLayout.CENTER);
+            inputPanel = teamInputPanel("파랑팀", Team.BLUE, blueInput, blueBtn, blueFlipLabel, new Color(133, 171, 236));
         }
+        int desiredWidth = boardPanel.getPreferredSize().width + 40;
+        inputPanel.setPreferredSize(new Dimension(desiredWidth, inputPanel.getPreferredSize().height));
+        bottom.add(inputPanel);
+        refreshFlipLabels();
+
+        ImageIcon yellowTeamIcon = loadScaledIcon("resources/images/yellow_team.png", 140, 180);
+        ImageIcon blueTeamIcon = loadScaledIcon("resources/images/blue_team.png", 140, 180);
 
         // 6) 프레임 레이아웃 조립
-        setLayout(new BorderLayout(8, 8));
-        add(top, BorderLayout.NORTH);
-        add(centerPanel, BorderLayout.CENTER);
-        add(bottom, BorderLayout.SOUTH);
+        JPanel middle = new JPanel(new BorderLayout(8, 0));
+        middle.setOpaque(false);
+        middle.add(buildSidePanel("노랑팀", yellowPlayerName, new Color(241, 209, 109), yellowTeamIcon, myTeam == Team.YELLOW), BorderLayout.WEST);
+        middle.add(centerPanel, BorderLayout.CENTER);
+        middle.add(buildSidePanel("파랑팀", bluePlayerName, new Color(133, 171, 236), blueTeamIcon, myTeam == Team.BLUE), BorderLayout.EAST);
+
+        JPanel root = new JPanel(new BorderLayout(8, 8)) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                if (backgroundImage != null) {
+                    g.drawImage(backgroundImage, 0, 0, getWidth(), getHeight(), this);
+                } else {
+                    g.setColor(new Color(19, 36, 49));
+                    g.fillRect(0, 0, getWidth(), getHeight());
+                }
+            }
+        };
+        root.setOpaque(false);
+        root.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
+        root.add(top, BorderLayout.NORTH);
+        root.add(middle, BorderLayout.CENTER);
+        root.add(bottom, BorderLayout.SOUTH);
+        setContentPane(root);
 
         // 7) 이벤트 - "내 팀"의 입력만 서버로 전송
         yellowBtn.addActionListener(e -> handleLocalInput(Team.YELLOW, yellowInput));
@@ -132,7 +172,6 @@ public class GameFrame extends JFrame {
         }
 
         // 9) 윈도우 설정
-        getContentPane().setBackground(new Color(19, 36, 49)); // 전체 배경(바다 느낌)
         setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE); // 클라이언트 종료 시 GameClient에서 처리
         pack();
         setLocationRelativeTo(null);
@@ -167,7 +206,7 @@ public class GameFrame extends JFrame {
     }
 
     /** 좌/우 팀 입력 패널 구성 — 팀 색상/라벨/텍스트필드/버튼 */
-    private JPanel teamInputPanel(String title, Team team, JTextField field, JButton btn, Color tone) {
+    private JPanel teamInputPanel(String title, Team team, JTextField field, JButton btn, JLabel flipLabel, Color tone) {
         JLabel titleL = new JLabel(title);
         titleL.setFont(titleL.getFont().deriveFont(Font.BOLD, 14f));
         titleL.setForeground(Color.BLACK);
@@ -191,8 +230,30 @@ public class GameFrame extends JFrame {
         row.add(field, BorderLayout.CENTER);
         row.add(btn, BorderLayout.EAST);
 
+        JPanel flipPanel = new JPanel();
+        flipPanel.setOpaque(false);
+        flipPanel.setLayout(new BoxLayout(flipPanel, BoxLayout.Y_AXIS));
+        JLabel flipTitle = new JLabel("내가 뒤집은 판");
+        flipTitle.setForeground(Color.DARK_GRAY);
+        flipTitle.setAlignmentX(Component.CENTER_ALIGNMENT);
+        flipLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        JPanel flipCard = new JPanel(new BorderLayout());
+        flipCard.setOpaque(true);
+        flipCard.setBackground(new Color(255, 255, 255, 210));
+        flipCard.setBorder(BorderFactory.createEmptyBorder(8, 14, 8, 14));
+        flipCard.add(flipLabel, BorderLayout.CENTER);
+
+        flipPanel.add(flipTitle);
+        flipPanel.add(Box.createVerticalStrut(6));
+        flipPanel.add(flipCard);
+
+        JPanel body = new JPanel(new BorderLayout(8, 6));
+        body.setOpaque(false);
+        body.add(flipPanel, BorderLayout.WEST);
+        body.add(row, BorderLayout.CENTER);
+
         wrap.add(titleL, BorderLayout.NORTH);
-        wrap.add(row, BorderLayout.SOUTH);
+        wrap.add(body, BorderLayout.SOUTH);
         return wrap;
     }
 
@@ -269,6 +330,7 @@ public class GameFrame extends JFrame {
         boardPanel.animateFlips(flips);
         yellowScore.setText(model.getScore(Team.YELLOW) + "P");
         blueScore.setText(model.getScore(Team.BLUE) + "P");
+        refreshFlipLabels();
 
         if (team == myTeam) {
             JTextField myField = (myTeam == Team.YELLOW) ? yellowInput : blueInput;
@@ -363,4 +425,82 @@ public class GameFrame extends JFrame {
         centerCardLayout.show(centerPanel, "board");
         JOptionPane.showMessageDialog(this, "보너스 타임 종료!", "알림", JOptionPane.INFORMATION_MESSAGE);
     }
+
+
+    private JLabel flipCounterLabel() {
+        JLabel l = new JLabel("0개", SwingConstants.CENTER);
+        l.setFont(l.getFont().deriveFont(Font.BOLD, 18f));
+        l.setForeground(Color.DARK_GRAY);
+        l.setOpaque(false);
+        return l;
+    }
+
+    private void refreshFlipLabels() {
+        yellowFlipLabel.setText(model.getFlips(Team.YELLOW) + "개");
+        blueFlipLabel.setText(model.getFlips(Team.BLUE) + "개");
+    }
+
+    private JPanel buildSidePanel(String teamLabel, String playerName, Color tone, ImageIcon emblem, boolean isMine) {
+        JPanel panel = new JPanel();
+        panel.setOpaque(false);
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        panel.setBorder(BorderFactory.createEmptyBorder(6, 6, 6, 6));
+        panel.setPreferredSize(new Dimension(170, 0));
+
+        JLabel iconLabel = new JLabel();
+        iconLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        if (emblem != null) {
+            iconLabel.setIcon(emblem);
+        }
+        panel.add(iconLabel);
+        panel.add(Box.createVerticalStrut(8));
+
+        JLabel teamTitle = new JLabel(teamLabel + (isMine ? " (내 팀)" : ""));
+        teamTitle.setAlignmentX(Component.CENTER_ALIGNMENT);
+        teamTitle.setFont(teamTitle.getFont().deriveFont(Font.BOLD, 16f));
+        teamTitle.setForeground(Color.WHITE);
+
+        JLabel nameLabel = new JLabel(playerName, SwingConstants.CENTER);
+        nameLabel.setOpaque(true);
+        nameLabel.setBackground(new Color(tone.getRed(), tone.getGreen(), tone.getBlue(), 210));
+        nameLabel.setForeground(Color.BLACK);
+        nameLabel.setBorder(BorderFactory.createEmptyBorder(10, 12, 10, 12));
+        nameLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        panel.add(teamTitle);
+        panel.add(Box.createVerticalStrut(6));
+        panel.add(nameLabel);
+
+        return panel;
+    }
+
+    private ImageIcon loadScaledIcon(String path, int w, int h) {
+        Image img = loadImage(path);
+        if (img == null) return null;
+        Image scaled = img.getScaledInstance(w, h, Image.SCALE_SMOOTH);
+        return new ImageIcon(scaled);
+    }
+
+    private Image loadImage(String path) {
+        try {
+            File f = new File(path);
+            if (f.exists()) {
+                return ImageIO.read(f);
+            }
+
+            File f2 = new File(System.getProperty("user.dir"), path);
+            if (f2.exists()) {
+                return ImageIO.read(f2);
+            }
+
+            java.net.URL res = GameFrame.class.getResource("/" + path);
+            if (res != null) {
+                return ImageIO.read(res);
+            }
+        } catch (Exception e) {
+            // ignore, fallback to null image
+        }
+        return null;
+    }
+
 }
