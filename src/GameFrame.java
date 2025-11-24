@@ -10,9 +10,9 @@ import java.util.List;
 /**
  * 메인 프레임: 사진의 화면 구성을 Swing으로 재현.
  *
- * 상단: [노랑팀 카드(점수)]  [중앙 타이머 00:53]  [파랑팀 카드(점수)]
+ * 상단: [노랑팀 카드(점수)] [중앙 타이머 00:53] [파랑팀 카드(점수)]
  * 중앙: 보드(BoardPanel)
- * 하단: 좌측(노랑팀 입력창 + 버튼)  |  우측(파랑팀 입력창 + 버튼)
+ * 하단: 좌측(노랑팀 입력창 + 버튼) | 우측(파랑팀 입력창 + 버튼)
  *
  * [네트워크 변경점]
  * - GameModel을 직접 생성하지 않고, GameClient로부터 전달받음.
@@ -26,7 +26,7 @@ public class GameFrame extends JFrame {
     // ---- 모델/네트워크 ----
     private final GameModel model;
     private final IGameClient client; // 서버와 통신할 클라이언트 (또는 로컬 매니저)
-    private final Team myTeam;       // 이 프레임의 플레이어 팀 (YELLOW or BLUE)
+    private final Team myTeam; // 이 프레임의 플레이어 팀 (YELLOW or BLUE)
 
     // ---- UI 구성요소(상단) ----
     private final JLabel yellowScore = scoreBadge(new Color(0xF2, 0xC1, 0x4E));
@@ -67,9 +67,9 @@ public class GameFrame extends JFrame {
         this.myTeam = myTeam;
         this.yellowPlayerName = yellowPlayerName;
         this.bluePlayerName = bluePlayerName;
-        this.backgroundImage = loadImage("resources/images/game_background_pirate.png");
+        this.backgroundImage = loadImage("resources/images/game_background.png");
         this.boardPanel = new BoardPanel(model);
-        
+
         // 타이머 초기화 (모델의 시간으로)
         timerLabel.setText(formatSec(model.secondsLeft()));
 
@@ -118,7 +118,8 @@ public class GameFrame extends JFrame {
         bottom.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
         JPanel inputPanel;
         if (myTeam == Team.YELLOW) {
-            inputPanel = teamInputPanel("노랑팀", Team.YELLOW, yellowInput, yellowBtn, yellowFlipLabel, new Color(241, 209, 109));
+            inputPanel = teamInputPanel("노랑팀", Team.YELLOW, yellowInput, yellowBtn, yellowFlipLabel,
+                    new Color(241, 209, 109));
         } else {
             inputPanel = teamInputPanel("파랑팀", Team.BLUE, blueInput, blueBtn, blueFlipLabel, new Color(133, 171, 236));
         }
@@ -133,9 +134,11 @@ public class GameFrame extends JFrame {
         // 6) 프레임 레이아웃 조립
         JPanel middle = new JPanel(new BorderLayout(8, 0));
         middle.setOpaque(false);
-        middle.add(buildSidePanel("노랑팀", yellowPlayerName, new Color(241, 209, 109), yellowTeamIcon, myTeam == Team.YELLOW), BorderLayout.WEST);
+        middle.add(buildSidePanel("노랑팀", yellowPlayerName, new Color(241, 209, 109), yellowTeamIcon,
+                myTeam == Team.YELLOW), BorderLayout.WEST);
         middle.add(centerPanel, BorderLayout.CENTER);
-        middle.add(buildSidePanel("파랑팀", bluePlayerName, new Color(133, 171, 236), blueTeamIcon, myTeam == Team.BLUE), BorderLayout.EAST);
+        middle.add(buildSidePanel("파랑팀", bluePlayerName, new Color(133, 171, 236), blueTeamIcon, myTeam == Team.BLUE),
+                BorderLayout.EAST);
 
         JPanel root = new JPanel(new BorderLayout(8, 8)) {
             @Override
@@ -177,7 +180,6 @@ public class GameFrame extends JFrame {
         setLocationRelativeTo(null);
     }
 
-
     /** 사진의 '카드 배지' 느낌을 주기 위한 점수 라벨 스타일 */
     private static JLabel scoreBadge(Color fg) {
         JLabel l = new JLabel("0P", SwingConstants.CENTER);
@@ -197,16 +199,17 @@ public class GameFrame extends JFrame {
                 g2.fillRoundRect(0, 0, getWidth(), getHeight(), 22, 22);
             }
         };
-        p.setOpaque(false); 
+        p.setOpaque(false);
         inner.setOpaque(false);
-        
+
         p.setBorder(BorderFactory.createEmptyBorder(8, 14, 8, 14));
         p.add(inner, BorderLayout.CENTER);
         return p;
     }
 
     /** 좌/우 팀 입력 패널 구성 — 팀 색상/라벨/텍스트필드/버튼 */
-    private JPanel teamInputPanel(String title, Team team, JTextField field, JButton btn, JLabel flipLabel, Color tone) {
+    private JPanel teamInputPanel(String title, Team team, JTextField field, JButton btn, JLabel flipLabel,
+            Color tone) {
         JLabel titleL = new JLabel(title);
         titleL.setFont(titleL.getFont().deriveFont(Font.BOLD, 14f));
         titleL.setForeground(Color.BLACK);
@@ -237,9 +240,15 @@ public class GameFrame extends JFrame {
         flipTitle.setForeground(Color.DARK_GRAY);
         flipTitle.setAlignmentX(Component.CENTER_ALIGNMENT);
         flipLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-        JPanel flipCard = new JPanel(new BorderLayout());
-        flipCard.setOpaque(true);
-        flipCard.setBackground(new Color(255, 255, 255, 210));
+        JPanel flipCard = new JPanel(new BorderLayout()) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                g.setColor(new Color(255, 255, 255, 210));
+                g.fillRect(0, 0, getWidth(), getHeight());
+            }
+        };
+        flipCard.setOpaque(false);
         flipCard.setBorder(BorderFactory.createEmptyBorder(8, 14, 8, 14));
         flipCard.add(flipLabel, BorderLayout.CENTER);
 
@@ -261,10 +270,12 @@ public class GameFrame extends JFrame {
      * (7) 로컬 입력 처리
      */
     private void handleLocalInput(Team team, JTextField field) {
-        if (team != myTeam || model.secondsLeft() <= 0) return;
+        if (team != myTeam || model.secondsLeft() <= 0)
+            return;
 
         String input = field.getText();
-        if (input == null || input.isBlank()) return;
+        if (input == null || input.isBlank())
+            return;
 
         if (isBonusTime) {
             client.sendSentenceInput(team, input);
@@ -277,7 +288,8 @@ public class GameFrame extends JFrame {
      * (8) 타이머가 0이 되면 입력 비활성화 (양쪽 모두)
      */
     private void disableInputs() {
-        for (var c : new JComponent[]{yellowInput, yellowBtn, blueInput, blueBtn}) c.setEnabled(false);
+        for (var c : new JComponent[] { yellowInput, yellowBtn, blueInput, blueBtn })
+            c.setEnabled(false);
     }
 
     /** (9) 남은 시간 "MM:SS" 포맷 */
@@ -286,11 +298,12 @@ public class GameFrame extends JFrame {
         int s = Math.max(0, sec) % 60;
         return String.format("%02d:%02d", m, s);
     }
-    
+
     /** (신규) 사운드 재생 헬퍼 */
     private void playSound(String soundFileName) {
         new Thread(() -> {
-            try (AudioInputStream audioIn = AudioSystem.getAudioInputStream(new File("resources/sounds/" + soundFileName))) {
+            try (AudioInputStream audioIn = AudioSystem
+                    .getAudioInputStream(new File("resources/sounds/" + soundFileName))) {
                 Clip clip = AudioSystem.getClip();
                 clip.open(audioIn);
                 clip.start();
@@ -306,23 +319,24 @@ public class GameFrame extends JFrame {
     }
 
     // --- [신규] 서버 메시지 처리기 (GameClient의 리스너 스레드가 호출) ---
-    
+
     /**
      * (신규) 서버로부터 "시간 1초 경과" 메시지를 받았을 때 (EDT에서 호출 보장)
      */
     public void handleRemoteTick() {
-        model.tickOneSecond(); 
-        timerLabel.setText(formatSec(model.secondsLeft())); 
+        model.tickOneSecond();
+        timerLabel.setText(formatSec(model.secondsLeft()));
     }
 
     /**
      * (신규) 서버로부터 "입력 처리" 명령을 받았을 때 (EDT에서 호출 보장)
      */
     public void handleRemoteInput(Team team, String input) {
-        if (model.secondsLeft() <= 0) return;
+        if (model.secondsLeft() <= 0)
+            return;
 
         java.util.List<GameModel.FlipResult> flips = model.flipByInput(team, input);
-        
+
         if (!flips.isEmpty()) {
             playSound("bell.wav");
         }
@@ -348,12 +362,13 @@ public class GameFrame extends JFrame {
     public void handleRemoteGameOver() {
         playSound("finish.wav");
         disableInputs();
-        
+
         int y = model.getScore(Team.YELLOW);
         int b = model.getScore(Team.BLUE);
         String msg = (y == b) ? "비겼습니다!"
                 : (y > b ? "노랑팀 승리!" : "파랑팀 승리!");
-        JOptionPane.showMessageDialog(this, msg + "  (노랑 " + y + " / 파랑 " + b + ")", "게임 종료", JOptionPane.INFORMATION_MESSAGE);
+        JOptionPane.showMessageDialog(this, msg + "  (노랑 " + y + " / 파랑 " + b + ")", "게임 종료",
+                JOptionPane.INFORMATION_MESSAGE);
         client.gameHasFinished();
     }
 
@@ -364,7 +379,7 @@ public class GameFrame extends JFrame {
      */
     public void handleBonusTimeStart(java.util.List<String> sentences) {
         isBonusTime = true;
-        
+
         for (int i = 0; i < sentenceLabels.size(); i++) {
             if (i < sentences.size()) {
                 sentenceLabels.get(i).setText(sentences.get(i));
@@ -374,11 +389,12 @@ public class GameFrame extends JFrame {
                 sentenceLabels.get(i).setFont(sentenceLabels.get(i).getFont().deriveFont(attributes));
             }
         }
-        
+
         centerCardLayout.show(centerPanel, "bonus");
-        
-        JOptionPane.showMessageDialog(this, "BONUS TIME! 20초간 문장을 입력하여 500점을 획득하세요!", "보너스 타임!", JOptionPane.INFORMATION_MESSAGE);
-        
+
+        JOptionPane.showMessageDialog(this, "BONUS TIME! 20초간 문장을 입력하여 500점을 획득하세요!", "보너스 타임!",
+                JOptionPane.INFORMATION_MESSAGE);
+
         if (myTeam == Team.YELLOW) {
             yellowInput.requestFocusInWindow();
         } else {
@@ -390,7 +406,8 @@ public class GameFrame extends JFrame {
      * (신규) 서버로부터 "문장 입력 결과" 메시지를 받았을 때
      */
     public void handleBonusSentenceResult(boolean success, String sentence, Team team) {
-        if (!isBonusTime) return;
+        if (!isBonusTime)
+            return;
 
         if (success) {
             model.addScore(team, 500);
@@ -401,15 +418,19 @@ public class GameFrame extends JFrame {
         for (JLabel label : sentenceLabels) {
             if (label.getText().equals(sentence)) {
                 if (success) {
-                    label.setForeground(team == Team.YELLOW ? new Color(0xF2, 0xC1, 0x4E) : new Color(0x5D, 0xA3, 0xFA));
-                    
+                    label.setForeground(
+                            team == Team.YELLOW ? new Color(0xF2, 0xC1, 0x4E) : new Color(0x5D, 0xA3, 0xFA));
+
                     java.util.Map<java.awt.font.TextAttribute, Object> attributes = new java.util.HashMap<>();
-                    attributes.put(java.awt.font.TextAttribute.STRIKETHROUGH, java.awt.font.TextAttribute.STRIKETHROUGH_ON);
+                    attributes.put(java.awt.font.TextAttribute.STRIKETHROUGH,
+                            java.awt.font.TextAttribute.STRIKETHROUGH_ON);
                     label.setFont(label.getFont().deriveFont(attributes));
 
                     if (team == myTeam) {
-                        if (myTeam == Team.YELLOW) yellowInput.setText("");
-                        else blueInput.setText("");
+                        if (myTeam == Team.YELLOW)
+                            yellowInput.setText("");
+                        else
+                            blueInput.setText("");
                     }
                 }
                 break;
@@ -425,7 +446,6 @@ public class GameFrame extends JFrame {
         centerCardLayout.show(centerPanel, "board");
         JOptionPane.showMessageDialog(this, "보너스 타임 종료!", "알림", JOptionPane.INFORMATION_MESSAGE);
     }
-
 
     private JLabel flipCounterLabel() {
         JLabel l = new JLabel("0개", SwingConstants.CENTER);
@@ -476,7 +496,8 @@ public class GameFrame extends JFrame {
 
     private ImageIcon loadScaledIcon(String path, int w, int h) {
         Image img = loadImage(path);
-        if (img == null) return null;
+        if (img == null)
+            return null;
         Image scaled = img.getScaledInstance(w, h, Image.SCALE_SMOOTH);
         return new ImageIcon(scaled);
     }

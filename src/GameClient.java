@@ -24,13 +24,13 @@ public class GameClient implements IGameClient {
     private ObjectOutputStream oos;
     private ObjectInputStream ois;
     private String nickname = "Player";
-    
+
     // UI
-    private LobbyFrame lobbyFrame;        // 메인 로비 UI
+    private LobbyFrame lobbyFrame; // 메인 로비 UI
     private WaitingRoomFrame waitingRoomFrame; // 대기방 UI
-    private GameFrame gameFrame;          // 실제 게임 UI
-    
-    private GameModel localModel;         // 서버와 동기화될 로컬 모델
+    private GameFrame gameFrame; // 실제 게임 UI
+
+    private GameModel localModel; // 서버와 동기화될 로컬 모델
     private java.util.List<NetworkProtocol.PlayerInfo> currentPlayers = new java.util.ArrayList<>();
 
     public void start() {
@@ -107,20 +107,23 @@ public class GameClient implements IGameClient {
                 java.awt.GridBagConstraints gbc = new java.awt.GridBagConstraints();
                 gbc.gridx = 0;
                 gbc.gridy = 0;
-                gbc.anchor = java.awt.GridBagConstraints.CENTER;
+                gbc.weighty = 1.0; // 중요: 이 값이 있어야 패널 전체 높이를 사용하여 하단 배치가 됨
+                gbc.anchor = java.awt.GridBagConstraints.SOUTH;
+                gbc.insets = new java.awt.Insets(0, 0, 50, 0); // 바닥에서 50px 띄움
                 imagePanel.add(overlay, gbc);
 
-                message = new Object[]{imagePanel};
+                message = new Object[] { imagePanel };
             } else {
                 JPanel simplePanel = new JPanel(new java.awt.GridLayout(2, 2, 6, 6));
                 simplePanel.add(new JLabel("서버 IP 주소:"));
                 simplePanel.add(ipField);
                 simplePanel.add(new JLabel("닉네임"));
                 simplePanel.add(nicknameField);
-                message = new Object[]{simplePanel};
+                message = new Object[] { simplePanel };
             }
 
-            int result = JOptionPane.showConfirmDialog(null, message, "서버 접속", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+            int result = JOptionPane.showConfirmDialog(null, message, "서버 접속", JOptionPane.OK_CANCEL_OPTION,
+                    JOptionPane.PLAIN_MESSAGE);
             if (result == JOptionPane.OK_OPTION) {
                 ip = ipField.getText().trim();
                 String enteredNickname = nicknameField.getText().trim();
@@ -131,7 +134,8 @@ public class GameClient implements IGameClient {
         } catch (Exception e) {
             ip = JOptionPane.showInputDialog(null, "서버 IP 주소를 입력하세요", "localhost");
         }
-        if (ip == null || ip.isBlank()) return;
+        if (ip == null || ip.isBlank())
+            return;
 
         try {
             socket = new Socket(ip, PORT);
@@ -179,23 +183,25 @@ public class GameClient implements IGameClient {
                 } else if (msg instanceof NetworkProtocol.Msg_S2C_PlayerListUpdated m) {
                     setCurrentPlayers(m.players());
                     SwingUtilities.invokeLater(() -> {
-                        if (waitingRoomFrame != null) waitingRoomFrame.updatePlayers(m.players());
+                        if (waitingRoomFrame != null)
+                            waitingRoomFrame.updatePlayers(m.players());
                     });
                 } else if (msg instanceof NetworkProtocol.Msg_S2C_WaitingChat m) {
                     SwingUtilities.invokeLater(() -> {
-                        if (waitingRoomFrame != null) waitingRoomFrame.appendChat(m.sender(), m.text());
+                        if (waitingRoomFrame != null)
+                            waitingRoomFrame.appendChat(m.sender(), m.text());
                     });
                 } else if (msg instanceof NetworkProtocol.Msg_S2C_RoomResponseFailure m) {
-                    SwingUtilities.invokeLater(() ->
-                        lobbyFrame.setStatus(m.reason(), Color.RED));
+                    SwingUtilities.invokeLater(() -> lobbyFrame.setStatus(m.reason(), Color.RED));
                     JOptionPane.showMessageDialog(lobbyFrame, m.reason(), "오류", JOptionPane.ERROR_MESSAGE);
                 } else if (msg instanceof NetworkProtocol.Msg_S2C_ReturnToLobby) {
                     handleReturnToLobby("게임 종료. 로비로 복귀합니다");
                 } else if (msg instanceof NetworkProtocol.Msg_S2C_OpponentLeft) {
-                    JOptionPane.showMessageDialog(gameFrame, "상대방이 나갔습니다. 로비로 복귀합니다", "게임 중단", JOptionPane.WARNING_MESSAGE);
+                    JOptionPane.showMessageDialog(gameFrame, "상대방이 나갔습니다. 로비로 복귀합니다", "게임 중단",
+                            JOptionPane.WARNING_MESSAGE);
                     handleReturnToLobby("상대방이 나갔습니다");
 
-                // --- 게임 시작/진행 메시지 ---
+                    // --- 게임 시작/진행 메시지 ---
                 } else if (msg instanceof NetworkProtocol.Msg_S2C_GameStart m) {
                     initializeGame(m.assignedTeam(), m.board(), m.secondsLeft());
                 } else if (gameFrame != null) {
@@ -205,19 +211,22 @@ public class GameClient implements IGameClient {
                         SwingUtilities.invokeLater(() -> gameFrame.handleRemoteTick());
                     } else if (msg instanceof NetworkProtocol.Msg_S2C_GameOver) {
                         SwingUtilities.invokeLater(() -> gameFrame.handleRemoteGameOver());
-                    } else if (msg instanceof NetworkProtocol.Msg_S2C_BonusTimeStart m){
-                        SwingUtilities.invokeLater(()-> gameFrame.handleBonusTimeStart(m.sentences()));
-                    } else if (msg instanceof NetworkProtocol.Msg_S2C_BonusSentenceResult m){
-                        SwingUtilities.invokeLater(()->gameFrame.handleBonusSentenceResult(m.success(), m.sentence(), m.team()));
-                    } else if (msg instanceof NetworkProtocol.Msg_S2C_BonusTimeEnd){
-                        SwingUtilities.invokeLater(()->gameFrame.handleBonusTimeEnd());
+                    } else if (msg instanceof NetworkProtocol.Msg_S2C_BonusTimeStart m) {
+                        SwingUtilities.invokeLater(() -> gameFrame.handleBonusTimeStart(m.sentences()));
+                    } else if (msg instanceof NetworkProtocol.Msg_S2C_BonusSentenceResult m) {
+                        SwingUtilities.invokeLater(
+                                () -> gameFrame.handleBonusSentenceResult(m.success(), m.sentence(), m.team()));
+                    } else if (msg instanceof NetworkProtocol.Msg_S2C_BonusTimeEnd) {
+                        SwingUtilities.invokeLater(() -> gameFrame.handleBonusTimeEnd());
                     }
                 }
             }
         } catch (EOFException | SocketException e) {
             System.out.println("클라이언트가 서버와 연결을 잃었습니다");
-            if (gameFrame != null) gameFrame.dispose();
-            if (lobbyFrame != null) lobbyFrame.dispose();
+            if (gameFrame != null)
+                gameFrame.dispose();
+            if (lobbyFrame != null)
+                lobbyFrame.dispose();
             JOptionPane.showMessageDialog(null, "서버와 연결이 끊어졌습니다.", "연결 오류", JOptionPane.ERROR_MESSAGE);
         } catch (Exception e) {
             e.printStackTrace();
@@ -225,8 +234,7 @@ public class GameClient implements IGameClient {
             stop();
         }
     }
-    
-    
+
     /** (S2C) 게임 시작 메시지 수신 시 호출 */
     private void initializeGame(Team myTeam, Board board, int seconds) {
         TokenIndex localIndex = new TokenIndex();
@@ -253,18 +261,18 @@ public class GameClient implements IGameClient {
     }
 
     /** (S2C) 게임 종료 -> 대기방 복귀 */
-    private void handleGameFinished(){
-        SwingUtilities.invokeLater(()-> {
-            if(gameFrame != null){
+    private void handleGameFinished() {
+        SwingUtilities.invokeLater(() -> {
+            if (gameFrame != null) {
                 gameFrame.dispose();
                 gameFrame = null;
                 localModel = null;
             }
-            if(waitingRoomFrame != null){
+            if (waitingRoomFrame != null) {
                 waitingRoomFrame.setVisible(true);
                 waitingRoomFrame.appendChat("SYSTEM", "게임이 종료되었습니다. 다시 시작하려면 준비하세요.");
-            }else{
-                //waitingRoomFrame이 없는 비정상적인 경우 로비로 이동
+            } else {
+                // waitingRoomFrame이 없는 비정상적인 경우 로비로 이동
                 handleReturnToLobby("게임 종료. 로비로 복귀합니다.");
             }
         });
@@ -273,7 +281,7 @@ public class GameClient implements IGameClient {
     public void gameHasFinished() {
         handleGameFinished();
     }
-    
+
     /** (S2C) 게임 종료/중단 -> 로비 복귀 */
     private void handleReturnToLobby(String message) {
         SwingUtilities.invokeLater(() -> {
@@ -305,19 +313,21 @@ public class GameClient implements IGameClient {
             System.err.println("클라이언트 메시지 전송 오류 - " + e.getMessage());
         }
     }
-    
+
     // --- UI가 호출하는 메소드 ---
 
     /** (C2S) (CreateRoomDialog) 방 생성 요청 */
     public void sendCreateRoomRequest(String roomName, String password, int seconds, Team team) {
         sendMessage(new NetworkProtocol.Msg_C2S_CreateRoom(roomName, password, seconds, team));
-        if (lobbyFrame != null) lobbyFrame.setStatus("방 생성 요청 중...", Color.GRAY);
+        if (lobbyFrame != null)
+            lobbyFrame.setStatus("방 생성 요청 중...", Color.GRAY);
     }
-    
+
     /** (C2S) (JoinRoomDialog) 방 참여 요청 */
     public void sendJoinRoomRequest(String roomName, String password) {
         sendMessage(new NetworkProtocol.Msg_C2S_JoinRoom(roomName, password));
-        if (lobbyFrame != null) lobbyFrame.setStatus("방 참여 요청 중...", Color.GRAY);
+        if (lobbyFrame != null)
+            lobbyFrame.setStatus("방 참여 요청 중...", Color.GRAY);
     }
 
     /** (C2S) 로비 방 목록 요청 */
@@ -352,10 +362,10 @@ public class GameClient implements IGameClient {
     }
 
     /** (C2S) (GameFrame) 보너스 타임 문장 입력 요청 */
-    public void sendSentenceInput(Team team, String sentence){
-        sendMessage(new NetworkProtocol.Msg_C2S_SentenceInput(sentence,team));
+    public void sendSentenceInput(Team team, String sentence) {
+        sendMessage(new NetworkProtocol.Msg_C2S_SentenceInput(sentence, team));
     }
-    
+
     /** (C2S) (GameFrame) 게임방 나가기(X버튼) */
     public void disconnectFromGame() {
         sendMessage(new NetworkProtocol.Msg_C2S_LeaveRoom());
@@ -367,7 +377,8 @@ public class GameClient implements IGameClient {
     }
 
     /** 대기방 UI 열기 */
-    private void openWaitingRoom(NetworkProtocol.RoomInfo roomInfo, java.util.List<NetworkProtocol.PlayerInfo> players, Team myTeam) {
+    private void openWaitingRoom(NetworkProtocol.RoomInfo roomInfo, java.util.List<NetworkProtocol.PlayerInfo> players,
+            Team myTeam) {
         if (lobbyFrame != null) {
             lobbyFrame.setVisible(false);
         }
@@ -379,29 +390,32 @@ public class GameClient implements IGameClient {
         waitingRoomFrame.setVisible(true);
     }
 
-    private synchronized void setCurrentPlayers(java.util.List<NetworkProtocol.PlayerInfo> players){
+    private synchronized void setCurrentPlayers(java.util.List<NetworkProtocol.PlayerInfo> players) {
         this.currentPlayers = new java.util.ArrayList<>(players);
     }
 
-    private synchronized void clearCurrentPlayers(){
+    private synchronized void clearCurrentPlayers() {
         this.currentPlayers = new java.util.ArrayList<>();
     }
 
-    private synchronized String findPlayerName(Team team, Team myAssignedTeam){
+    private synchronized String findPlayerName(Team team, Team myAssignedTeam) {
         for (NetworkProtocol.PlayerInfo p : currentPlayers) {
             if (p.team() == team) {
                 return p.nickname();
             }
         }
-        if (team == myAssignedTeam) return nickname;
+        if (team == myAssignedTeam)
+            return nickname;
         return (team == Team.YELLOW) ? "노랑팀" : "파랑팀";
     }
 
     /** (종료) */
     public void stop() {
         try {
-            if (socket != null && !socket.isClosed()) socket.close();
-        } catch (IOException e) { /* 무시 */ }
+            if (socket != null && !socket.isClosed())
+                socket.close();
+        } catch (IOException e) {
+            /* 무시 */ }
         System.out.println("클라이언트가 연결 종료합니다.");
         System.exit(0);
     }
