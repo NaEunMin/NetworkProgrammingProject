@@ -74,9 +74,17 @@ public class WaitingRoomFrame extends JFrame {
     }
 
     private JPanel buildInfoPanel() {
-        JPanel info = new JPanel();
+        JPanel info = new JPanel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                g.setColor(getBackground());
+                g.fillRect(0, 0, getWidth(), getHeight());
+                super.paintComponent(g);
+            }
+        };
         info.setLayout(new BoxLayout(info, BoxLayout.Y_AXIS));
         info.setPreferredSize(new Dimension(220, 0));
+        info.setOpaque(false);
         info.setBackground(new Color(26, 52, 78, 200)); // 반투명
         info.setBorder(new EmptyBorder(16, 16, 16, 16));
 
@@ -131,7 +139,15 @@ public class WaitingRoomFrame extends JFrame {
     }
 
     private JPanel wrapSlot(String title, JLabel slot, Color headerColor) {
-        JPanel panel = new JPanel(new BorderLayout());
+        JPanel panel = new JPanel(new BorderLayout()) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                g.setColor(getBackground());
+                g.fillRect(0, 0, getWidth(), getHeight());
+                super.paintComponent(g);
+            }
+        };
+        panel.setOpaque(false);
         panel.setBackground(new Color(30, 58, 88, 200)); // 반투명
         panel.setBorder(new EmptyBorder(10, 10, 10, 10));
 
@@ -149,18 +165,33 @@ public class WaitingRoomFrame extends JFrame {
     }
 
     private JLabel createSlotLabel(String placeholder) {
-        JLabel label = new JLabel(placeholder, SwingConstants.CENTER);
+        JLabel label = new JLabel(placeholder, SwingConstants.CENTER) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                g.setColor(getBackground());
+                g.fillRect(0, 0, getWidth(), getHeight());
+                super.paintComponent(g);
+            }
+        };
         label.setForeground(Color.WHITE);
         label.setFont(label.getFont().deriveFont(Font.BOLD, 16f));
-        label.setOpaque(true);
+        label.setOpaque(false);
         label.setBackground(new Color(38, 78, 120, 200)); // 반투명
         label.setBorder(new EmptyBorder(32, 8, 32, 8));
         return label;
     }
 
     private JPanel buildChatPanel() {
-        JPanel chatPanel = new JPanel(new BorderLayout(8, 8));
+        JPanel chatPanel = new JPanel(new BorderLayout(8, 8)) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                g.setColor(getBackground());
+                g.fillRect(0, 0, getWidth(), getHeight());
+                super.paintComponent(g);
+            }
+        };
         chatPanel.setPreferredSize(new Dimension(260, 0));
+        chatPanel.setOpaque(false);
         chatPanel.setBackground(new Color(26, 52, 78, 200)); // 반투명
         chatPanel.setBorder(new EmptyBorder(10, 10, 10, 10));
 

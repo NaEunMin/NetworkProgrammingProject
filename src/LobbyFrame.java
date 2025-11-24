@@ -43,7 +43,6 @@ public class LobbyFrame extends JFrame {
             }
         };
         content.setBorder(new EmptyBorder(12, 12, 12, 12));
-        // content.setBackground(new Color(14, 32, 52)); // 이미지 사용하므로 배경색 제거
         setContentPane(content);
 
         content.add(buildProfilePanel(), BorderLayout.WEST);
@@ -58,10 +57,17 @@ public class LobbyFrame extends JFrame {
     }
 
     private JPanel buildProfilePanel() {
-        JPanel panel = new JPanel();
+        JPanel panel = new JPanel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                g.setColor(getBackground());
+                g.fillRect(0, 0, getWidth(), getHeight());
+                super.paintComponent(g);
+            }
+        };
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
         panel.setPreferredSize(new Dimension(220, 0));
-        panel.setOpaque(true);
+        panel.setOpaque(false); // 투명 배경 처리를 위해 false로 설정
         panel.setBackground(new Color(26, 52, 78, 200)); // 반투명
         panel.setBorder(new EmptyBorder(20, 16, 20, 16));
 
@@ -99,8 +105,15 @@ public class LobbyFrame extends JFrame {
     }
 
     private JPanel buildLobbyPanel() {
-        JPanel panel = new JPanel(new BorderLayout(10, 10));
-        panel.setOpaque(true);
+        JPanel panel = new JPanel(new BorderLayout(10, 10)) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                g.setColor(getBackground());
+                g.fillRect(0, 0, getWidth(), getHeight());
+                super.paintComponent(g);
+            }
+        };
+        panel.setOpaque(false); // 투명 배경 처리를 위해 false로 설정
         panel.setBackground(new Color(19, 44, 68, 200)); // 반투명
         panel.setBorder(new EmptyBorder(12, 12, 12, 12));
 
