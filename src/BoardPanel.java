@@ -3,6 +3,9 @@ import java.awt.*;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.awt.image.BufferedImage;
+import javax.imageio.ImageIO;
+import java.io.File;
 
 /**
  * 중앙 보드 패널. 뒤집기 애니메이션을 앞/뒷면 전환처럼 보이도록 조정.
@@ -18,12 +21,20 @@ public class BoardPanel extends JPanel {
     private final NetworkProtocol.Theme theme; // [NEW]
     private final Map<Pos, FlipAnim> animations = new ConcurrentHashMap<>();
     private final javax.swing.Timer animTimer;
+    private Image specialImg;
 
     public BoardPanel(GameModel model, NetworkProtocol.Theme theme) {
         this.model = model;
         this.theme = theme;
         setBackground(new Color(19, 36, 49));
         setOpaque(false);
+
+        // Load special item image
+        try {
+            specialImg = ImageIO.read(new File("resources/images/treasure_chest.png"));
+        } catch (Exception e) {
+            System.err.println("Failed to load treasure_chest.png: " + e.getMessage());
+        }
 
         javax.swing.Timer t = new javax.swing.Timer(16, e -> {
             if (animations.isEmpty()) {
@@ -89,19 +100,46 @@ public class BoardPanel extends JPanel {
                 Color to = getTeamColor(cell.owner());
                 Color drawColor = lerpColor(from, to, eased);
 
+                // Determine which team we are currently rendering
+                Team currentRenderTeam;
+                if (anim != null) {
+                    currentRenderTeam = firstHalf ? anim.fromTeam : cell.owner();
+                } else {
+                    currentRenderTeam = cell.owner();
+                }
+
                 double angle = Math.PI * eased;
                 double scaleX = 0.3 + 0.7 * Math.abs(Math.cos(angle)); // 최소 30%까지 축소
                 double scaleY = 0.94 + 0.06 * Math.sin(angle); // 살짝 튀어나오는 느낌
+
+                // 텍스트/셀용 스케일은 위 값을 그대로 사용하고,
+                // 이미지만 별도로 스케일링하여 텍스트가 커지는 문제 해결
+                double imgScaleX = scaleX;
+                double imgScaleY = scaleY;
+
+                if (currentRenderTeam == Team.SPECIAL) {
+                    imgScaleX = 2.0 + 0.06 * Math.sin(angle);
+                    imgScaleY = 2.0 + 0.06 * Math.sin(angle);
+                }
+
                 int w = (int) (CELL * scaleX);
                 int h = (int) (CELL * scaleY);
                 int offsetX = x + (CELL - w) / 2;
                 int offsetY = y + (CELL - h) / 2;
 
-                g.setColor(drawColor);
-                g.fillRoundRect(offsetX, offsetY, w, h, 10, 10);
+                if (currentRenderTeam == Team.SPECIAL && specialImg != null) {
+                    int imgW = (int) (CELL * imgScaleX);
+                    int imgH = (int) (CELL * imgScaleY);
+                    int imgOffsetX = x + (CELL - imgW) / 2;
+                    int imgOffsetY = y + (CELL - imgH) / 2;
+                    g.drawImage(specialImg, imgOffsetX, imgOffsetY, imgW, imgH, null);
+                } else {
+                    g.setColor(drawColor);
+                    g.fillRoundRect(offsetX, offsetY, w, h, 10, 10);
+                }
 
-                // [NEW] 스페셜 아이템 효과 (반짝임)
-                if (cell.owner() == Team.SPECIAL) {
+                // 스페셜 아이템 효과 (반짝임) - 이미지가 있으면 생략
+                if (cell.owner() == Team.SPECIAL && specialImg == null) {
                     drawSparkle(g, offsetX, offsetY, w, h);
                 }
 
@@ -118,9 +156,9 @@ public class BoardPanel extends JPanel {
                 g.setColor(new Color(0, 0, 0, 110));
                 g.drawString(token, tx + 1, ty + 1);
 
-                // 스페셜이면 글자색을 검정이나 다른색으로? 일단 흰색 유지하되 잘보이게
+                // 스페셜이면 글자색을 검정이나 다른색으로?
                 if (cell.owner() == Team.SPECIAL) {
-                    g.setColor(Color.BLACK);
+                    g.setColor(Color.WHITE); // 흰색
                 } else {
                     g.setColor(Color.WHITE);
                 }
@@ -164,7 +202,7 @@ public class BoardPanel extends JPanel {
     public void animateFlips(List<GameModel.FlipResult> flips) {
         long now = System.currentTimeMillis();
         for (GameModel.FlipResult f : flips) {
-            animations.put(f.pos(), new FlipAnim(now, getTeamColor(f.from()), f.fromToken()));
+            animations.put(f.pos(), new FlipAnim(now, getTeamColor(f.from()), f.fromToken(), f.from()));
         }
         if (!flips.isEmpty() && !animTimer.isRunning()) {
             animTimer.start();
@@ -183,11 +221,13 @@ public class BoardPanel extends JPanel {
         final long startMs;
         final Color from;
         final String fromToken;
+        final Team fromTeam;
 
-        FlipAnim(long startMs, Color from, String fromToken) {
+        FlipAnim(long startMs, Color from, String fromToken, Team fromTeam) {
             this.startMs = startMs;
             this.from = from;
             this.fromToken = fromToken;
+            this.fromTeam = fromTeam;
         }
 
         double progress() {

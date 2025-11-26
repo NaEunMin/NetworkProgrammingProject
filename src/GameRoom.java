@@ -202,8 +202,8 @@ public class GameRoom {
                 gameModel.tickOneSecond();
                 broadcast(new NetworkProtocol.Msg_S2C_Tick());
 
-                // [NEW] 랜덤 아이템 생성 (약 5% 확률로 매 초 시도, 최대 1개 등 제한 가능)
-                if (Math.random() < 0.05) {
+                // 랜덤 아이템 생성 (약 5% 확률로 매 초 시도)
+                if (Math.random() < 0.15) {
                     spawnSpecialItem();
                 }
 
