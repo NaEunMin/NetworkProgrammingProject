@@ -27,13 +27,12 @@ public class GameFrame extends JFrame {
     private final GameModel model;
     private final IGameClient client; // 서버와 통신할 클라이언트 (또는 로컬 매니저)
     private final Team myTeam; // 이 프레임의 플레이어 팀 (YELLOW or BLUE)
+    private final NetworkProtocol.Theme theme;
 
     // ---- UI 구성요소(상단) ----
-    private final JLabel yellowScore = scoreBadge(new Color(0xF2, 0xC1, 0x4E));
-    private final JLabel blueScore = scoreBadge(new Color(0x5D, 0xA3, 0xFA));
+    private final JLabel yellowScore;
+    private final JLabel blueScore;
     private final JLabel timerLabel = new JLabel("01:00", SwingConstants.CENTER);
-    private final String yellowPlayerName;
-    private final String bluePlayerName;
     private final Image backgroundImage;
 
     // ---- 중앙 보드 ----
@@ -59,16 +58,39 @@ public class GameFrame extends JFrame {
      * 생성자:
      * 모델, 클라이언트, 내 팀을 외부(GameClient)에서 주입받음.
      */
-    public GameFrame(GameModel model, IGameClient client, Team myTeam, String yellowPlayerName, String bluePlayerName) {
+    public GameFrame(GameModel model, IGameClient client, Team myTeam, String yellowPlayerName, String bluePlayerName,
+            NetworkProtocol.Theme theme) {
         super("판 뒤집기 (1:1 · 실시간 · Swing) - " + myTeam + "팀");
 
         this.model = model;
         this.client = client;
         this.myTeam = myTeam;
-        this.yellowPlayerName = yellowPlayerName;
-        this.bluePlayerName = bluePlayerName;
-        this.backgroundImage = loadImage("resources/images/game_background.png");
-        this.boardPanel = new BoardPanel(model);
+        this.theme = theme;
+
+        // 테마에 따른 리소스/색상 설정
+        String bgPath = "resources/images/game_background.png";
+        Color yellowColor = new Color(0xF2, 0xC1, 0x4E);
+        Color blueColor = new Color(0x5D, 0xA3, 0xFA);
+        String yellowTeamName = "노랑팀";
+        String blueTeamName = "파랑팀";
+        String yellowIconPath = "resources/images/yellow_team_pirate.png";
+        String blueIconPath = "resources/images/blue_team_pirate.png";
+
+        if (theme == NetworkProtocol.Theme.NIGHT_MARKET) {
+            bgPath = "resources/images/dark_game_background.png";
+            yellowColor = new Color(147, 112, 219); // Purple
+            blueColor = new Color(255, 165, 0); // Orange
+            yellowTeamName = "보라팀";
+            blueTeamName = "주황팀";
+            yellowIconPath = "resources/images/purple_team_pirate.png";
+            blueIconPath = "resources/images/orange_team_pirate.png";
+        }
+
+        this.backgroundImage = loadImage(bgPath);
+        this.yellowScore = scoreBadge(yellowColor);
+        this.blueScore = scoreBadge(blueColor);
+
+        this.boardPanel = new BoardPanel(model, theme);
 
         // 타이머 초기화 (모델의 시간으로)
         timerLabel.setText(formatSec(model.secondsLeft()));
@@ -108,9 +130,9 @@ public class GameFrame extends JFrame {
         timerLabel.setForeground(Color.WHITE);
         JPanel timerWrap = pill(timerLabel, new Color(26, 47, 60));
 
-        top.add(pill(yellowScore, new Color(241, 209, 109)), BorderLayout.WEST);
+        top.add(pill(yellowScore, yellowColor), BorderLayout.WEST);
         top.add(timerWrap, BorderLayout.CENTER);
-        top.add(pill(blueScore, new Color(133, 171, 236)), BorderLayout.EAST);
+        top.add(pill(blueScore, blueColor), BorderLayout.EAST);
 
         // 5) 하단 입력 영역(좌: 노랑 / 우: 파랑) — 동시에 입력 가능
         JPanel bottom = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 8));
@@ -118,26 +140,26 @@ public class GameFrame extends JFrame {
         bottom.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
         JPanel inputPanel;
         if (myTeam == Team.YELLOW) {
-            inputPanel = teamInputPanel("노랑팀", Team.YELLOW, yellowInput, yellowBtn, yellowFlipLabel,
-                    new Color(241, 209, 109));
+            inputPanel = teamInputPanel(yellowTeamName, Team.YELLOW, yellowInput, yellowBtn, yellowFlipLabel,
+                    yellowColor);
         } else {
-            inputPanel = teamInputPanel("파랑팀", Team.BLUE, blueInput, blueBtn, blueFlipLabel, new Color(133, 171, 236));
+            inputPanel = teamInputPanel(blueTeamName, Team.BLUE, blueInput, blueBtn, blueFlipLabel, blueColor);
         }
         int desiredWidth = boardPanel.getPreferredSize().width + 40;
         inputPanel.setPreferredSize(new Dimension(desiredWidth, inputPanel.getPreferredSize().height));
         bottom.add(inputPanel);
         refreshFlipLabels();
 
-        ImageIcon yellowTeamIcon = loadScaledIcon("resources/images/yellow_team_pirate.png", 140, 180);
-        ImageIcon blueTeamIcon = loadScaledIcon("resources/images/blue_team_pirate.png", 140, 180);
+        ImageIcon yellowTeamIcon = loadScaledIcon(yellowIconPath, 140, 180);
+        ImageIcon blueTeamIcon = loadScaledIcon(blueIconPath, 140, 180);
 
         // 6) 프레임 레이아웃 조립
         JPanel middle = new JPanel(new BorderLayout(8, 0));
         middle.setOpaque(false);
-        middle.add(buildSidePanel("노랑팀", yellowPlayerName, new Color(241, 209, 109), yellowTeamIcon,
+        middle.add(buildSidePanel(yellowTeamName, yellowPlayerName, yellowColor, yellowTeamIcon,
                 myTeam == Team.YELLOW), BorderLayout.WEST);
         middle.add(centerPanel, BorderLayout.CENTER);
-        middle.add(buildSidePanel("파랑팀", bluePlayerName, new Color(133, 171, 236), blueTeamIcon, myTeam == Team.BLUE),
+        middle.add(buildSidePanel(blueTeamName, bluePlayerName, blueColor, blueTeamIcon, myTeam == Team.BLUE),
                 BorderLayout.EAST);
 
         JPanel root = new JPanel(new BorderLayout(8, 8)) {
@@ -356,6 +378,10 @@ public class GameFrame extends JFrame {
         }
     }
 
+    public void repaintBoard() {
+        boardPanel.repaint();
+    }
+
     /**
      * (신규) 서버로부터 "게임 종료" 메시지를 받았을 때 (EDT에서 호출 보장)
      */
@@ -523,5 +549,4 @@ public class GameFrame extends JFrame {
         }
         return null;
     }
-
 }

@@ -23,50 +23,25 @@ public class GameServer {
     // 로비에 있는 클라이언트 목록
     private final Set<ClientHandler> lobbyClients = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
-    //보너스 타임 문장 풀
+    // 보너스 타임 문장 풀
     private final SentencePool sentencePool;
 
-    public GameServer(){
+    public GameServer() {
         this.sentencePool = SentencePool.fromFile("resources/text.txt");
     }
+
     public void start() {
         try (ServerSocket serverSocket = new ServerSocket(PORT)) {
             System.out.println("서버: " + PORT + " 포트에서 클라이언트 대기 중...");
 
             while (true) {
                 Socket socket = serverSocket.accept();
-                System.out.println("서버: 클라이언트 연결: " + socket.getRemoteSocketAddress());
-                
-                ClientHandler handler = new ClientHandler(socket, this);
-                new Thread(handler).start();
+                ClientHandler client = new ClientHandler(socket, this);
+                new Thread(client).start();
             }
-
         } catch (IOException e) {
-            System.err.println("서버: 오류 발생 - " + e.getMessage());
+            e.printStackTrace();
         }
-    }
-
-    // --- 방 생성/참여/삭제 ---
-
-    /** 클라이언트의 방 생성 요청 처리 */
-    public synchronized void handleCreateRoom(ClientHandler creator, String roomName, String password, int gameTimeSec, Team chosenTeam) {
-        if (activeRooms.containsKey(roomName)) {
-            creator.sendMessage(new NetworkProtocol.Msg_S2C_RoomResponseFailure("이미 존재하는 방 이름입니다."));
-            return;
-        }
-
-        System.out.println("서버: " + creator.getNickname() + "이(가) 방 생성 시도: [" + roomName + "]");
-        
-        // [MODIFIED] Use createGameModel
-        GameModel gameModel = createGameModel(gameTimeSec);
-
-        GameRoom newRoom = new GameRoom(roomName, password, gameModel, this, sentencePool);
-        newRoom.addPlayer(creator, chosenTeam);
-        
-        activeRooms.put(roomName, newRoom);
-        
-        sendEnterWaitingRoom(creator, newRoom, chosenTeam);
-        broadcastRoomUpdated(newRoom);
     }
 
     /** [NEW] 새로운 게임 모델 생성 (보드 리셋 포함) */
@@ -77,6 +52,37 @@ public class GameServer {
         return new GameModel(board, index, gameTimeSec, 1, WordPool.fromBoard(board));
     }
 
+    /** 방 생성 요청 처리 */
+    public synchronized void handleCreateRoom(ClientHandler creator, String roomName, String password, int gameTimeSec,
+            boolean bonusEnabled, NetworkProtocol.Theme theme, Team chosenTeam) {
+        if (activeRooms.containsKey(roomName)) {
+            creator.sendMessage(new NetworkProtocol.Msg_S2C_RoomResponseFailure("이미 존재하는 방 이름입니다."));
+            return;
+        }
+
+        // 게임 모델 생성
+        GameModel model = createGameModel(gameTimeSec);
+
+        // 방 생성
+        GameRoom newRoom = new GameRoom(roomName, password, model, gameTimeSec, bonusEnabled, theme, this,
+                sentencePool);
+
+        // 방장 입장 (선택한 팀으로)
+        if (!newRoom.addPlayer(creator, chosenTeam)) {
+            creator.sendMessage(new NetworkProtocol.Msg_S2C_RoomResponseFailure("방 생성 후 입장 실패"));
+            return;
+        }
+
+        activeRooms.put(roomName, newRoom);
+        System.out.println("서버: 방 생성 [" + roomName + "] (테마: " + theme + ", 보너스: " + bonusEnabled + ")");
+
+        // 방장에게 대기방 입장 알림
+        sendEnterWaitingRoom(creator, newRoom, chosenTeam);
+
+        // 로비에 방 목록 갱신 알림
+        broadcastRoomUpdated(newRoom);
+    }
+
     /** 클라이언트의 방 참여 요청 처리 */
     public synchronized void handleJoinRoom(ClientHandler joiner, String roomName, String password) {
         GameRoom room = activeRooms.get(roomName);
@@ -85,7 +91,7 @@ public class GameServer {
             joiner.sendMessage(new NetworkProtocol.Msg_S2C_RoomResponseFailure("존재하지 않는 방입니다."));
             return;
         }
-        
+
         if (!room.getPassword().isEmpty() && !room.getPassword().equals(password)) {
             joiner.sendMessage(new NetworkProtocol.Msg_S2C_RoomResponseFailure("비밀번호가 다릅니다."));
             return;
@@ -95,12 +101,12 @@ public class GameServer {
         if (teamToJoin == null) {
             teamToJoin = room.getOppositeTeam(Team.YELLOW);
         }
-        
+
         if (teamToJoin == null || !room.addPlayer(joiner, teamToJoin)) {
-             joiner.sendMessage(new NetworkProtocol.Msg_S2C_RoomResponseFailure("참여할 자리가 없거나 입장에 실패했습니다."));
-             return;
+            joiner.sendMessage(new NetworkProtocol.Msg_S2C_RoomResponseFailure("참여할 자리가 없거나 입장에 실패했습니다."));
+            return;
         }
-        
+
         System.out.println("서버: " + joiner.getNickname() + "이(가) 방 [" + roomName + "]에 " + teamToJoin + "팀으로 참여.");
 
         sendEnterWaitingRoom(joiner, room, teamToJoin);
@@ -156,7 +162,8 @@ public class GameServer {
 
     /** 기본 단어 세팅 (resources/word.txt가 있으면 랜덤 채움) */
     private void fillBoardFromFilesOrFallback(Board board, TokenIndex idx) {
-        List<String> fallback = List.of("\uac10\uc790", "\uc0ac\uacfc", "\ud3ec\ub3c4", "\uc218\ubc15", "\ucf54\ucf54", "\ud638\ub791\uc774", "\uacf0\ub3cc", "\uc5ec\uc6b0", "\ub291\ub300", "\ud1a0\ub07c");
+        List<String> fallback = List.of("\uac10\uc790", "\uc0ac\uacfc", "\ud3ec\ub3c4", "\uc218\ubc15", "\ucf54\ucf54",
+                "\ud638\ub791\uc774", "\uacf0\ub3cc", "\uc5ec\uc6b0", "\ub291\ub300", "\ud1a0\ub07c");
 
         Path wordPath = Path.of("resources", "word.txt");
         List<String> words = readOrFallback(wordPath, fallback);
@@ -169,7 +176,8 @@ public class GameServer {
                 filtered.add(trimmed);
             }
         }
-        if (filtered.isEmpty()) filtered = fallback;
+        if (filtered.isEmpty())
+            filtered = fallback;
 
         int totalCells = board.rows() * board.cols();
         List<String> pool = new ArrayList<>(filtered);
@@ -207,12 +215,11 @@ public class GameServer {
         }
         return fallback;
     }
-    
+
     public static void main(String[] args) {
         new GameServer().start();
     }
 }
-
 
 /**
  * (GameServer 클래스 바로 아래 두거나 별도 파일로 이동)
@@ -223,7 +230,7 @@ class ClientHandler implements Runnable {
     private final GameServer server;
     private ObjectOutputStream oos;
     private ObjectInputStream ois;
-    
+
     private GameRoom currentRoom = null; // 현재 방
     public final String id; // 연결된 ID
     private String nickname = "Player";
@@ -233,7 +240,7 @@ class ClientHandler implements Runnable {
         this.server = server;
         this.id = socket.getRemoteSocketAddress().toString();
     }
-    
+
     public void setCurrentRoom(GameRoom room) {
         this.currentRoom = room;
     }
@@ -264,32 +271,33 @@ class ClientHandler implements Runnable {
                     server.sendRoomList(this);
 
                 } else if (msg instanceof NetworkProtocol.Msg_C2S_CreateRoom req) {
-                    server.handleCreateRoom(this, req.roomName(), req.password(), req.gameTimeSec(), req.chosenTeam());
-                
+                    server.handleCreateRoom(this, req.roomName(), req.password(), req.gameTimeSec(), req.bonusEnabled(),
+                            req.theme(), req.chosenTeam());
+
                 } else if (msg instanceof NetworkProtocol.Msg_C2S_JoinRoom req) {
                     server.handleJoinRoom(this, req.roomName(), req.password());
 
-                // --- 대기/게임 중 메시지 ---
+                    // --- 대기/게임 중 메시지 ---
                 } else if (currentRoom != null) {
-                    
+
                     if (msg instanceof NetworkProtocol.Msg_C2S_InputRequest req) {
                         currentRoom.handleInput(this, req.team(), req.input());
-                    
+
                     } else if (msg instanceof NetworkProtocol.Msg_C2S_LeaveRoom) {
                         currentRoom.removePlayer(this);
 
-                } else if (msg instanceof NetworkProtocol.Msg_C2S_StartGame) {
-                    currentRoom.startGameBy(this);
+                    } else if (msg instanceof NetworkProtocol.Msg_C2S_StartGame) {
+                        currentRoom.startGameBy(this);
 
-                } else if (msg instanceof NetworkProtocol.Msg_C2S_ToggleReady reqReady) {
-                    currentRoom.setReady(this, reqReady.ready());
+                    } else if (msg instanceof NetworkProtocol.Msg_C2S_ToggleReady reqReady) {
+                        currentRoom.setReady(this, reqReady.ready());
 
-                } else if (msg instanceof NetworkProtocol.Msg_C2S_WaitingChat reqChat) {
-                    currentRoom.broadcastWaitingChat(nickname, reqChat.text());
-                } else if (msg instanceof NetworkProtocol.Msg_C2S_SentenceInput req) {
-                    currentRoom.handleSentenceInput(this, req.team(), req.sentence());
+                    } else if (msg instanceof NetworkProtocol.Msg_C2S_WaitingChat reqChat) {
+                        currentRoom.broadcastWaitingChat(nickname, reqChat.text());
+                    } else if (msg instanceof NetworkProtocol.Msg_C2S_SentenceInput req) {
+                        currentRoom.handleSentenceInput(this, req.team(), req.sentence());
+                    }
                 }
-            }
             }
         } catch (EOFException | SocketException e) {
             System.out.println("서버: 클라이언트[" + id + "] 연결 종료.");
@@ -300,7 +308,10 @@ class ClientHandler implements Runnable {
                 currentRoom.removePlayer(this);
             }
             server.unregisterLobbyClient(this);
-            try { socket.close(); } catch (IOException e) {}
+            try {
+                socket.close();
+            } catch (IOException e) {
+            }
         }
     }
 
@@ -310,7 +321,7 @@ class ClientHandler implements Runnable {
             if (oos != null) {
                 oos.writeObject(message);
                 oos.flush();
-                oos.reset(); 
+                oos.reset();
             }
         } catch (IOException e) {
             System.err.println("서버: [" + id + "] 메시지 전송 오류 - " + e.getMessage());

@@ -9,17 +9,19 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class BoardPanel extends JPanel {
 
-    private static final int CELL   = 56;
-    private static final int PAD    = 14;
+    private static final int CELL = 56;
+    private static final int PAD = 14;
     private static final Color GRID = new Color(0, 0, 0, 40);
     private static final int ANIM_MS = 260;
 
     private final GameModel model;
+    private final NetworkProtocol.Theme theme; // [NEW]
     private final Map<Pos, FlipAnim> animations = new ConcurrentHashMap<>();
     private final javax.swing.Timer animTimer;
 
-    public BoardPanel(GameModel model) {
+    public BoardPanel(GameModel model, NetworkProtocol.Theme theme) {
         this.model = model;
+        this.theme = theme;
         setBackground(new Color(19, 36, 49));
         setOpaque(false);
 
@@ -37,6 +39,19 @@ public class BoardPanel extends JPanel {
     public Dimension getPreferredSize() {
         Board b = model.board();
         return new Dimension(PAD * 2 + b.cols() * CELL, PAD * 2 + b.rows() * CELL);
+    }
+
+    private Color getTeamColor(Team team) {
+        if (team == Team.SPECIAL)
+            return new Color(team.rgb);
+
+        if (theme == NetworkProtocol.Theme.NIGHT_MARKET) {
+            if (team == Team.YELLOW)
+                return new Color(147, 112, 219); // Purple
+            if (team == Team.BLUE)
+                return new Color(255, 165, 0); // Orange
+        }
+        return new Color(team.rgb);
     }
 
     @Override
@@ -70,13 +85,13 @@ public class BoardPanel extends JPanel {
                         ? (firstHalf ? anim.fromToken : cell.token())
                         : cell.token();
 
-                Color from = anim != null ? anim.from : new Color(cell.owner().rgb);
-                Color to   = new Color(cell.owner().rgb);
+                Color from = anim != null ? anim.from : getTeamColor(cell.owner());
+                Color to = getTeamColor(cell.owner());
                 Color drawColor = lerpColor(from, to, eased);
 
                 double angle = Math.PI * eased;
                 double scaleX = 0.3 + 0.7 * Math.abs(Math.cos(angle)); // 최소 30%까지 축소
-                double scaleY = 0.94 + 0.06 * Math.sin(angle);        // 살짝 튀어나오는 느낌
+                double scaleY = 0.94 + 0.06 * Math.sin(angle); // 살짝 튀어나오는 느낌
                 int w = (int) (CELL * scaleX);
                 int h = (int) (CELL * scaleY);
                 int offsetX = x + (CELL - w) / 2;
@@ -84,6 +99,11 @@ public class BoardPanel extends JPanel {
 
                 g.setColor(drawColor);
                 g.fillRoundRect(offsetX, offsetY, w, h, 10, 10);
+
+                // [NEW] 스페셜 아이템 효과 (반짝임)
+                if (cell.owner() == Team.SPECIAL) {
+                    drawSparkle(g, offsetX, offsetY, w, h);
+                }
 
                 Font tokenFont = fitFontToCell(g, baseFont, token, w, h);
                 g.setFont(tokenFont);
@@ -97,7 +117,13 @@ public class BoardPanel extends JPanel {
 
                 g.setColor(new Color(0, 0, 0, 110));
                 g.drawString(token, tx + 1, ty + 1);
-                g.setColor(Color.white);
+
+                // 스페셜이면 글자색을 검정이나 다른색으로? 일단 흰색 유지하되 잘보이게
+                if (cell.owner() == Team.SPECIAL) {
+                    g.setColor(Color.BLACK);
+                } else {
+                    g.setColor(Color.WHITE);
+                }
                 g.drawString(token, tx, ty);
                 g.setFont(baseFont);
 
@@ -138,7 +164,7 @@ public class BoardPanel extends JPanel {
     public void animateFlips(List<GameModel.FlipResult> flips) {
         long now = System.currentTimeMillis();
         for (GameModel.FlipResult f : flips) {
-            animations.put(f.pos(), new FlipAnim(now, new Color(f.from().rgb), f.fromToken()));
+            animations.put(f.pos(), new FlipAnim(now, getTeamColor(f.from()), f.fromToken()));
         }
         if (!flips.isEmpty() && !animTimer.isRunning()) {
             animTimer.start();
@@ -157,14 +183,28 @@ public class BoardPanel extends JPanel {
         final long startMs;
         final Color from;
         final String fromToken;
+
         FlipAnim(long startMs, Color from, String fromToken) {
             this.startMs = startMs;
             this.from = from;
             this.fromToken = fromToken;
         }
+
         double progress() {
             double t = (System.currentTimeMillis() - startMs) / (double) ANIM_MS;
             return Math.min(1.0, t);
+        }
+    }
+
+    private void drawSparkle(Graphics2D g, int x, int y, int w, int h) {
+        g.setColor(Color.YELLOW);
+        // 간단한 별 모양이나 점 찍기
+        long time = System.currentTimeMillis();
+        for (int i = 0; i < 3; i++) {
+            double offset = (time / 150.0 + i * 2.0) % (Math.PI * 2);
+            int sx = x + w / 2 + (int) (Math.cos(offset) * w / 3);
+            int sy = y + h / 2 + (int) (Math.sin(offset) * h / 3);
+            g.fillOval(sx - 2, sy - 2, 5, 5);
         }
     }
 }
