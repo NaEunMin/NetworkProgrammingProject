@@ -1,9 +1,8 @@
-import java.io.Serializable;
 
-// Serializable을 구현해야 네트워크 전송이 가능합니다. (Enum은 기본 구현)
-public enum Team implements Serializable {
+public enum Team {
     YELLOW(0xF2C14E),
-    BLUE  (0x5DA3FA);
+    BLUE(0x5DA3FA),
+    SPECIAL(0xFFFFFF);
 
     public final int rgb;
 
@@ -12,6 +11,8 @@ public enum Team implements Serializable {
     }
 
     public Team opponent() {
+        if (this == SPECIAL)
+            return null; // Special has no single opponent
         return this == YELLOW ? BLUE : YELLOW;
     }
 }

@@ -29,20 +29,31 @@ public class GameModel {
         this.blueFlips = 0;
     }
 
-    public Board board() { return board; }
-    public synchronized int secondsLeft() { return secondsLeft; }
-    public synchronized void tickOneSecond() { if (secondsLeft > 0) secondsLeft--; }
+    public Board board() {
+        return board;
+    }
+
+    public synchronized int secondsLeft() {
+        return secondsLeft;
+    }
+
+    public synchronized void tickOneSecond() {
+        if (secondsLeft > 0)
+            secondsLeft--;
+    }
+
     public synchronized int getScore(Team team) {
-        return (team == Team.YELLOW)? yellowCount : blueCount;
+        return (team == Team.YELLOW) ? yellowCount : blueCount;
     }
+
     public synchronized int getFlips(Team team) {
-        return (team == Team.YELLOW)? yellowFlips : blueFlips;
+        return (team == Team.YELLOW) ? yellowFlips : blueFlips;
     }
-    public synchronized void addScore(Team team, int score){
-        if(team == Team.YELLOW){
+
+    public synchronized void addScore(Team team, int score) {
+        if (team == Team.YELLOW) {
             yellowCount += score;
-        }
-        else {
+        } else {
             blueCount += score;
         }
     }
@@ -53,15 +64,29 @@ public class GameModel {
      */
     public synchronized java.util.List<FlipResult> flipByInput(Team myTeam, String rawInput) {
         java.util.List<FlipResult> results = new java.util.ArrayList<>();
-        if (rawInput == null || rawInput.isBlank()) return results;
+        if (rawInput == null || rawInput.isBlank())
+            return results;
 
         Team opponent = myTeam.opponent();
-        List<Pos> targets = index.positionsOf(opponent, rawInput);
-        if (targets.isEmpty()) return results;
+
+        // 1. 상대방(Opponent) 토큰 검색
+        List<Pos> targets = new java.util.ArrayList<>(index.positionsOf(opponent, rawInput));
+
+        // 2. 스페셜(SPECIAL) 토큰 검색 (누구나 뒤집을 수 있음)
+        List<Pos> specialTargets = index.positionsOf(Team.SPECIAL, rawInput);
+        targets.addAll(specialTargets);
+
+        if (targets.isEmpty())
+            return results;
+
+        // 섞어서 랜덤하게 뒤집거나, 순서대로 뒤집거나... 여기선 발견된 순서대로
+        // (필요하다면 shuffle)
+        // java.util.Collections.shuffle(targets);
 
         int flipped = 0;
         for (Pos p : targets) {
-            if (flipped >= maxFlipPerInput) break;
+            if (flipped >= maxFlipPerInput)
+                break;
 
             Cell cell = board.get(p.r(), p.c());
             Team prevOwner = cell.owner();
@@ -71,7 +96,7 @@ public class GameModel {
             String newToken = wordPool.nextToken(oldToken);
 
             // 인덱스 업데이트
-            index.remove(opponent, oldToken, p);
+            index.remove(prevOwner, oldToken, p); // prevOwner가 SPECIAL일 수도 있음
             index.add(myTeam, newToken, p);
 
             // 상태 반영
@@ -79,12 +104,16 @@ public class GameModel {
             cell.setToken(newToken);
             results.add(new FlipResult(p, prevOwner, myTeam, oldToken, newToken));
 
-            if(myTeam == Team.YELLOW) {
-                yellowCount += 100;
-                yellowFlips++;
+            int score = 100;
+            if (prevOwner == Team.SPECIAL) {
+                score = 300; // 스페셜 아이템 점수
             }
-            else {
-                blueCount += 100;
+
+            if (myTeam == Team.YELLOW) {
+                yellowCount += score;
+                yellowFlips++;
+            } else {
+                blueCount += score;
                 blueFlips++;
             }
             flipped++;
@@ -93,5 +122,20 @@ public class GameModel {
         return results;
     }
 
-    public static record FlipResult(Pos pos, Team from, Team to, String fromToken, String toToken) {}
+    public static record FlipResult(Pos pos, Team from, Team to, String fromToken, String toToken) {
+    }
+
+    /** (서버 전용) 강제로 스페셜 아이템으로 변경 */
+    public synchronized void spawnSpecial(Pos pos) {
+        Cell cell = board.get(pos.r(), pos.c());
+        Team oldOwner = cell.owner();
+        String token = cell.token();
+
+        // 인덱스 갱신
+        index.remove(oldOwner, token, pos);
+        index.add(Team.SPECIAL, token, pos);
+
+        // 셀 갱신
+        cell.setOwner(Team.SPECIAL);
+    }
 }

@@ -203,7 +203,7 @@ public class GameClient implements IGameClient {
 
                     // --- 게임 시작/진행 메시지 ---
                 } else if (msg instanceof NetworkProtocol.Msg_S2C_GameStart m) {
-                    initializeGame(m.assignedTeam(), m.board(), m.secondsLeft());
+                    initializeGame(m.assignedTeam(), m.board(), m.secondsLeft(), m.theme());
                 } else if (gameFrame != null) {
                     if (msg instanceof NetworkProtocol.Msg_S2C_BroadcastInput m) {
                         SwingUtilities.invokeLater(() -> gameFrame.handleRemoteInput(m.team(), m.input()));
@@ -218,6 +218,21 @@ public class GameClient implements IGameClient {
                                 () -> gameFrame.handleBonusSentenceResult(m.success(), m.sentence(), m.team()));
                     } else if (msg instanceof NetworkProtocol.Msg_S2C_BonusTimeEnd) {
                         SwingUtilities.invokeLater(() -> gameFrame.handleBonusTimeEnd());
+                    } else if (msg instanceof NetworkProtocol.Msg_S2C_CellUpdate m) {
+                        SwingUtilities.invokeLater(() -> {
+                            if (localModel != null) {
+                                // 로컬 모델 업데이트 (강제)
+                                Cell cell = localModel.board().get(m.pos().r(), m.pos().c());
+                                cell.setOwner(m.owner());
+                                cell.setToken(m.token());
+
+                                if (m.owner() == Team.SPECIAL) {
+                                    localModel.spawnSpecial(m.pos());
+                                }
+
+                                gameFrame.repaintBoard();
+                            }
+                        });
                     }
                 }
             }
@@ -236,7 +251,7 @@ public class GameClient implements IGameClient {
     }
 
     /** (S2C) 게임 시작 메시지 수신 시 호출 */
-    private void initializeGame(Team myTeam, Board board, int seconds) {
+    private void initializeGame(Team myTeam, Board board, int seconds, NetworkProtocol.Theme theme) {
         TokenIndex localIndex = new TokenIndex();
         for (int r = 0; r < board.rows(); r++) {
             for (int c = 0; c < board.cols(); c++) {
@@ -255,7 +270,7 @@ public class GameClient implements IGameClient {
             if (waitingRoomFrame != null) {
                 waitingRoomFrame.setVisible(false);
             }
-            gameFrame = new GameFrame(localModel, this, myTeam, yellowName, blueName);
+            gameFrame = new GameFrame(localModel, this, myTeam, yellowName, blueName, theme);
             gameFrame.setVisible(true);
         });
     }
@@ -314,16 +329,7 @@ public class GameClient implements IGameClient {
         }
     }
 
-    // --- UI가 호출하는 메소드 ---
-
-    /** (C2S) (CreateRoomDialog) 방 생성 요청 */
-    public void sendCreateRoomRequest(String roomName, String password, int seconds, Team team) {
-        sendMessage(new NetworkProtocol.Msg_C2S_CreateRoom(roomName, password, seconds, team));
-        if (lobbyFrame != null)
-            lobbyFrame.setStatus("방 생성 요청 중...", Color.GRAY);
-    }
-
-    /** (C2S) (JoinRoomDialog) 방 참여 요청 */
+    /** (C2S) 방 참여 요청 */
     public void sendJoinRoomRequest(String roomName, String password) {
         sendMessage(new NetworkProtocol.Msg_C2S_JoinRoom(roomName, password));
         if (lobbyFrame != null)
@@ -364,6 +370,13 @@ public class GameClient implements IGameClient {
     /** (C2S) (GameFrame) 보너스 타임 문장 입력 요청 */
     public void sendSentenceInput(Team team, String sentence) {
         sendMessage(new NetworkProtocol.Msg_C2S_SentenceInput(sentence, team));
+    }
+
+    /** (C2S) 방 생성 요청 */
+    public void sendCreateRoomRequest(String roomName, String password, int gameTimeSec, boolean bonusEnabled,
+            NetworkProtocol.Theme theme, Team chosenTeam) {
+        sendMessage(new NetworkProtocol.Msg_C2S_CreateRoom(roomName, password, gameTimeSec, bonusEnabled, theme,
+                chosenTeam));
     }
 
     /** (C2S) (GameFrame) 게임방 나가기(X버튼) */

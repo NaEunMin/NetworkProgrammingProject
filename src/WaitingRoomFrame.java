@@ -25,7 +25,8 @@ public class WaitingRoomFrame extends JFrame {
 
     private Image backgroundImage;
 
-    public WaitingRoomFrame(GameClient client, NetworkProtocol.RoomInfo roomInfo, List<NetworkProtocol.PlayerInfo> players, Team myTeam) {
+    public WaitingRoomFrame(GameClient client, NetworkProtocol.RoomInfo roomInfo,
+            List<NetworkProtocol.PlayerInfo> players, Team myTeam) {
         super("대기방 - " + roomInfo.name());
         this.client = client;
         this.roomInfo = roomInfo;
@@ -34,10 +35,14 @@ public class WaitingRoomFrame extends JFrame {
         setSize(920, 620);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
-        
+
         // 이미지 로드
         try {
-            backgroundImage = new ImageIcon("resources/images/waiting_room_background_pirate.png").getImage();
+            String bgPath = "resources/images/waiting_room_background_pirate.png";
+            if (roomInfo.theme() == NetworkProtocol.Theme.NIGHT_MARKET) {
+                bgPath = "resources/images/dark_waiting_room_background.png";
+            }
+            backgroundImage = new ImageIcon(bgPath).getImage();
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -55,7 +60,7 @@ public class WaitingRoomFrame extends JFrame {
 
     private JPanel buildContent() {
         JPanel root = new JPanel(new BorderLayout(12, 12)) {
-             @Override
+            @Override
             protected void paintComponent(Graphics g) {
                 super.paintComponent(g);
                 if (backgroundImage != null) {
@@ -92,12 +97,22 @@ public class WaitingRoomFrame extends JFrame {
         roomNameLabel.setForeground(Color.WHITE);
         roomNameLabel.setFont(roomNameLabel.getFont().deriveFont(Font.BOLD, 18f));
 
-        timeLabel = new JLabel("게임 시간: " + roomInfo.seconds() + "초");
+        timeLabel = new JLabel("게임 시간: " + (roomInfo.totalSeconds() / 60) + "분");
         timeLabel.setForeground(new Color(200, 215, 230));
         timeLabel.setBorder(new EmptyBorder(8, 0, 0, 0));
 
+        JLabel bonusLabel = new JLabel("보너스 게임: " + (roomInfo.bonusEnabled() ? "ON" : "OFF"));
+        bonusLabel.setForeground(new Color(200, 215, 230));
+        bonusLabel.setBorder(new EmptyBorder(4, 0, 0, 0));
+
+        JLabel themeLabel = new JLabel("게임 테마: " + roomInfo.theme().getLabel());
+        themeLabel.setForeground(new Color(200, 215, 230));
+        themeLabel.setBorder(new EmptyBorder(4, 0, 0, 0));
+
         info.add(roomNameLabel);
         info.add(timeLabel);
+        info.add(bonusLabel);
+        info.add(themeLabel);
         info.add(Box.createVerticalGlue());
 
         return info;
@@ -110,11 +125,23 @@ public class WaitingRoomFrame extends JFrame {
         JPanel teams = new JPanel(new GridLayout(1, 2, 12, 0));
         teams.setOpaque(false);
 
-        yellowSlot = createSlotLabel("노랑팀");
-        blueSlot = createSlotLabel("파랑팀");
+        String yellowLabel = "노랑팀";
+        String blueLabel = "파랑팀";
+        Color yellowColor = new Color(250, 215, 120);
+        Color blueColor = new Color(140, 190, 255);
 
-        JPanel yellowPanel = wrapSlot("노랑팀", yellowSlot, new Color(250, 215, 120));
-        JPanel bluePanel = wrapSlot("파랑팀", blueSlot, new Color(140, 190, 255));
+        if (roomInfo.theme() == NetworkProtocol.Theme.NIGHT_MARKET) {
+            yellowLabel = "보라팀"; // YELLOW(Left) -> Purple
+            blueLabel = "주황팀"; // BLUE(Right) -> Orange
+            yellowColor = new Color(147, 112, 219); // Medium Purple
+            blueColor = new Color(255, 165, 0); // Orange
+        }
+
+        yellowSlot = createSlotLabel(yellowLabel);
+        blueSlot = createSlotLabel(blueLabel);
+
+        JPanel yellowPanel = wrapSlot(yellowLabel, yellowSlot, yellowColor);
+        JPanel bluePanel = wrapSlot(blueLabel, blueSlot, blueColor);
 
         teams.add(yellowPanel);
         teams.add(bluePanel);
@@ -227,7 +254,8 @@ public class WaitingRoomFrame extends JFrame {
 
     private void submitChat() {
         String text = chatInput.getText().trim();
-        if (text.isEmpty()) return;
+        if (text.isEmpty())
+            return;
         client.sendWaitingChat(text);
         chatInput.setText("");
     }
@@ -242,7 +270,8 @@ public class WaitingRoomFrame extends JFrame {
             String name = p.nickname();
             if (p.team() == myTeam) {
                 name = name + " (나)";
-                if (p.owner()) iAmOwner = true;
+                if (p.owner())
+                    iAmOwner = true;
                 amReady = p.ready();
             }
             String readyTag = p.ready() ? " - 준비" : "";
