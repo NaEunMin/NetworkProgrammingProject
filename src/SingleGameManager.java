@@ -180,7 +180,7 @@ public class SingleGameManager implements IGameClient {
                 var lines = Files.readAllLines(wordPath, StandardCharsets.UTF_8);
                 for (String w : lines) {
                     String trimmed = w.trim();
-                    if (!trimmed.isEmpty() && trimmed.length() <= 8) {
+                    if (!trimmed.isEmpty() && trimmed.length() <= 4) {
                         words.add(trimmed);
                     }
                 }

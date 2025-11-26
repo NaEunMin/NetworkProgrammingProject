@@ -1,5 +1,6 @@
 import javax.swing.*;
 import java.awt.*;
+import java.awt.geom.AffineTransform;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -143,18 +144,21 @@ public class BoardPanel extends JPanel {
                     drawSparkle(g, offsetX, offsetY, w, h);
                 }
 
-                Font tokenFont = fitFontToCell(g, baseFont, token, w, h);
-                g.setFont(tokenFont);
+                // Use smart text fitting
+                Layout layout = fitTextToCell(g, baseFont, token, w, h);
+                g.setFont(layout.font);
+                String drawText = layout.text;
+
                 FontMetrics fm = g.getFontMetrics();
 
-                int tw = fm.stringWidth(token);
+                int tw = fm.stringWidth(drawText);
                 int th = fm.getAscent();
                 int tx = offsetX + (w - tw) / 2;
                 // ascent/descent을 고려해 중앙 정렬(뒤집기 얇은 구간에서도 글자 잘림 방지)
                 int ty = offsetY + (h + th - fm.getDescent()) / 2;
 
                 g.setColor(new Color(0, 0, 0, 110));
-                g.drawString(token, tx + 1, ty + 1);
+                g.drawString(drawText, tx + 1, ty + 1);
 
                 // 스페셜이면 글자색을 검정이나 다른색으로?
                 if (cell.owner() == Team.SPECIAL) {
@@ -162,7 +166,7 @@ public class BoardPanel extends JPanel {
                 } else {
                     g.setColor(Color.WHITE);
                 }
-                g.drawString(token, tx, ty);
+                g.drawString(drawText, tx, ty);
                 g.setFont(baseFont);
 
                 g.setColor(GRID);
@@ -175,28 +179,35 @@ public class BoardPanel extends JPanel {
         }
     }
 
-    private Font fitFontToCell(Graphics2D g, Font base, String text, int cellW, int cellH) {
+    private record Layout(Font font, String text) {
+    }
+
+    private Layout fitTextToCell(Graphics2D g, Font base, String text, int cellW, int cellH) {
         int maxW = Math.max(10, cellW - 8);
         int maxH = Math.max(10, cellH - 4);
+
         Font f = base;
-        FontMetrics fm = g.getFontMetrics(f);
-
-        while ((fm.stringWidth(text) > maxW || fm.getHeight() > maxH) && f.getSize2D() > 9f) {
-            f = f.deriveFont(f.getSize2D() - 1f);
-            fm = g.getFontMetrics(f);
-        }
-
-        if (fm.stringWidth(text) > maxW) {
-            String ellipsis = "...";
-            for (int cut = text.length(); cut > 0; cut--) {
-                String candidate = text.substring(0, cut) + ellipsis;
-                if (fm.stringWidth(candidate) <= maxW) {
-                    text = candidate;
-                    break;
-                }
+        // 1. Reduce size (more aggressive, down to 6pt)
+        while (f.getSize2D() > 11f) {
+            FontMetrics fm = g.getFontMetrics(f);
+            if (fm.stringWidth(text) <= maxW && fm.getHeight() <= maxH) {
+                break;
             }
+            f = f.deriveFont(f.getSize2D() - 1f);
         }
-        return f;
+
+        // 2. Squeeze width
+        FontMetrics fm = g.getFontMetrics(f);
+        int textW = fm.stringWidth(text);
+        if (textW > maxW) {
+            double scale = (double) maxW / textW;
+            // No limit on compression, just fit it.
+            AffineTransform at = new AffineTransform();
+            at.scale(scale, 1.0);
+            f = f.deriveFont(at);
+        }
+
+        return new Layout(f, text);
     }
 
     public void animateFlips(List<GameModel.FlipResult> flips) {
