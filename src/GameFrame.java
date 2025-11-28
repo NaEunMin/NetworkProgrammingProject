@@ -289,6 +289,9 @@ public class GameFrame extends JFrame {
         if (input == null || input.isBlank())
             return;
 
+        if (input.length() > 4)
+            return;
+
         if (isBonusTime) {
             client.sendSentenceInput(team, input);
         } else {

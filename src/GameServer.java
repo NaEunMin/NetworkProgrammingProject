@@ -168,7 +168,7 @@ public class GameServer {
         Path wordPath = Path.of("resources", "word.txt");
         List<String> words = readOrFallback(wordPath, fallback);
 
-        int maxLen = 8; // 너무 긴 단어는 겹침 방지를 위해 제외
+        int maxLen = 4; // 너무 긴 단어는 겹침 방지를 위해 제외
         List<String> filtered = new ArrayList<>();
         for (String w : words) {
             String trimmed = w.trim();
