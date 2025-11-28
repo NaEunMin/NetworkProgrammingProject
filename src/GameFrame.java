@@ -42,9 +42,7 @@ public class GameFrame extends JFrame {
 
     // ---- 보너스 타임 UI ----
     private boolean isBonusTime = false;
-    private final JPanel bonusTimePanel = new JPanel();
-    private final JLabel bonusTitle = new JLabel("BONUS TIME!", SwingConstants.CENTER);
-    private final List<JLabel> sentenceLabels = new ArrayList<>();
+    private final BonusGamePanel bonusGamePanel = new BonusGamePanel(); // [MODIFIED] New Panel
 
     // ---- 하단 입력(좌/우) ----
     private final JTextField yellowInput = new JTextField(18);
@@ -95,29 +93,17 @@ public class GameFrame extends JFrame {
         // 타이머 초기화 (모델의 시간으로)
         timerLabel.setText(formatSec(model.secondsLeft()));
 
-        // 보너스 타임 패널 설정
-        bonusTimePanel.setLayout(new BoxLayout(bonusTimePanel, BoxLayout.Y_AXIS));
-        bonusTimePanel.setBackground(new Color(19, 36, 49));
-        bonusTimePanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
-        bonusTitle.setFont(new Font("Serif", Font.BOLD, 48));
-        bonusTitle.setForeground(Color.ORANGE);
-        bonusTitle.setAlignmentX(Component.CENTER_ALIGNMENT);
-        bonusTimePanel.add(bonusTitle);
-        bonusTimePanel.add(Box.createVerticalStrut(20));
-        for (int i = 0; i < 5; i++) {
-            JLabel sentenceLabel = new JLabel("", SwingConstants.CENTER);
-            sentenceLabel.setFont(new Font("Malgun Gothic", Font.PLAIN, 22));
-            sentenceLabel.setForeground(Color.WHITE);
-            sentenceLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-            sentenceLabels.add(sentenceLabel);
-            bonusTimePanel.add(sentenceLabel);
-            bonusTimePanel.add(Box.createVerticalStrut(10));
-        }
+        // 보너스 타임 패널 설정 (BonusGamePanel 내부에서 초기화됨)
+        // bonusTimePanel 관련 코드 제거됨
 
-        // 중앙 패널에 카드 레이아웃으로 보드와 보너스 패널 추가
+        // 중앙 패널에 카드 레이아웃으로 보드 추가 (보너스 패널은 GlassPane으로 이동)
         centerPanel.add(boardPanel, "board");
-        centerPanel.add(bonusTimePanel, "bonus");
+        // centerPanel.add(bonusGamePanel, "bonus"); // [REMOVED]
         centerPanel.setOpaque(false);
+        
+        // [NEW] 보너스 게임 패널을 GlassPane으로 설정 (전체 화면 오버레이)
+        setGlassPane(bonusGamePanel);
+        bonusGamePanel.setVisible(false);
 
         // 4) 상단 점수판 + 타이머 (사진 레이아웃을 흉내)
         JPanel top = new JPanel(new BorderLayout(8, 8));
@@ -148,7 +134,11 @@ public class GameFrame extends JFrame {
         int desiredWidth = boardPanel.getPreferredSize().width + 40;
         inputPanel.setPreferredSize(new Dimension(desiredWidth, inputPanel.getPreferredSize().height));
         bottom.add(inputPanel);
+        bottom.add(inputPanel);
         refreshFlipLabels();
+
+        // [NEW] 보너스 게임 패널에 입력 영역(bottom)을 알려주어, 그 부분만 오버레이에서 제외
+        bonusGamePanel.setInputArea(inputPanel);
 
         ImageIcon yellowTeamIcon = loadScaledIcon(yellowIconPath, 140, 180);
         ImageIcon blueTeamIcon = loadScaledIcon(blueIconPath, 140, 180);
@@ -406,20 +396,15 @@ public class GameFrame extends JFrame {
     public void handleBonusTimeStart(java.util.List<String> sentences) {
         isBonusTime = true;
 
-        for (int i = 0; i < sentenceLabels.size(); i++) {
-            if (i < sentences.size()) {
-                sentenceLabels.get(i).setText(sentences.get(i));
-                sentenceLabels.get(i).setForeground(Color.WHITE);
-                java.util.Map<java.awt.font.TextAttribute, Object> attributes = new java.util.HashMap<>();
-                attributes.put(java.awt.font.TextAttribute.STRIKETHROUGH, false);
-                sentenceLabels.get(i).setFont(sentenceLabels.get(i).getFont().deriveFont(attributes));
-            }
-        }
+        // [MODIFIED] 애니메이션 패널 시작 (GlassPane)
+        bonusGamePanel.setVisible(true);
+        bonusGamePanel.startBonusTime(sentences);
 
-        centerCardLayout.show(centerPanel, "bonus");
+        // centerCardLayout.show(centerPanel, "bonus"); // [REMOVED]
 
-        JOptionPane.showMessageDialog(this, "BONUS TIME! 20초간 문장을 입력하여 500점을 획득하세요!", "보너스 타임!",
-                JOptionPane.INFORMATION_MESSAGE);
+        // [MODIFIED] 팝업 제거 (애니메이션으로 대체)
+        // JOptionPane.showMessageDialog(this, "BONUS TIME! 20초간 문장을 입력하여 500점을 획득하세요!", "보너스 타임!",
+        //         JOptionPane.INFORMATION_MESSAGE);
 
         if (myTeam == Team.YELLOW) {
             yellowInput.requestFocusInWindow();
@@ -439,27 +424,15 @@ public class GameFrame extends JFrame {
             model.addScore(team, 500);
             yellowScore.setText(model.getScore(Team.YELLOW) + "P");
             blueScore.setText(model.getScore(Team.BLUE) + "P");
-        }
-
-        for (JLabel label : sentenceLabels) {
-            if (label.getText().equals(sentence)) {
-                if (success) {
-                    label.setForeground(
-                            team == Team.YELLOW ? new Color(0xF2, 0xC1, 0x4E) : new Color(0x5D, 0xA3, 0xFA));
-
-                    java.util.Map<java.awt.font.TextAttribute, Object> attributes = new java.util.HashMap<>();
-                    attributes.put(java.awt.font.TextAttribute.STRIKETHROUGH,
-                            java.awt.font.TextAttribute.STRIKETHROUGH_ON);
-                    label.setFont(label.getFont().deriveFont(attributes));
-
-                    if (team == myTeam) {
-                        if (myTeam == Team.YELLOW)
-                            yellowInput.setText("");
-                        else
-                            blueInput.setText("");
-                    }
-                }
-                break;
+            
+            // [MODIFIED] 사슬 끊기 효과
+            bonusGamePanel.solveSentence(sentence);
+            
+            if (team == myTeam) {
+                if (myTeam == Team.YELLOW)
+                    yellowInput.setText("");
+                else
+                    blueInput.setText("");
             }
         }
     }
@@ -469,8 +442,17 @@ public class GameFrame extends JFrame {
      */
     public void handleBonusTimeEnd() {
         isBonusTime = false;
-        centerCardLayout.show(centerPanel, "board");
-        JOptionPane.showMessageDialog(this, "보너스 타임 종료!", "알림", JOptionPane.INFORMATION_MESSAGE);
+        bonusGamePanel.endBonusTime(); // [MODIFIED] 퇴장 애니메이션
+        
+        // 잠시 후 보드로 복귀 (애니메이션 시간 고려)
+        Timer t = new Timer(2000, e -> {
+             // centerCardLayout.show(centerPanel, "board"); // [REMOVED]
+             bonusGamePanel.setVisible(false); // [MODIFIED] GlassPane 숨김
+             // [MODIFIED] 팝업 제거 (바로 복귀)
+             // JOptionPane.showMessageDialog(this, "보너스 타임 종료!", "알림", JOptionPane.INFORMATION_MESSAGE);
+        });
+        t.setRepeats(false);
+        t.start();
     }
 
     private JLabel flipCounterLabel() {
