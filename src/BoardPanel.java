@@ -55,7 +55,7 @@ public class BoardPanel extends JPanel {
 
     private Color getTeamColor(Team team) {
         if (team == Team.SPECIAL)
-            return new Color(team.rgb);
+            return Color.BLACK; // [MODIFIED] 배경색 검은색
 
         if (theme == NetworkProtocol.Theme.NIGHT_MARKET) {
             if (team == Team.YELLOW)
@@ -139,8 +139,9 @@ public class BoardPanel extends JPanel {
                     g.fillRoundRect(offsetX, offsetY, w, h, 10, 10);
                 }
 
-                // 스페셜 아이템 효과 (반짝임) - 이미지가 있으면 생략
-                if (cell.owner() == Team.SPECIAL && specialImg == null) {
+                // [NEW] 스페셜 아이템 효과 (반짝임 + 테두리 발광)
+                if (cell.owner() == Team.SPECIAL) {
+                    drawGlowingBorder(g, offsetX, offsetY, w, h); // [NEW] 발광 효과 추가
                     drawSparkle(g, offsetX, offsetY, w, h);
                 }
 
@@ -160,9 +161,10 @@ public class BoardPanel extends JPanel {
                 g.setColor(new Color(0, 0, 0, 110));
                 g.drawString(drawText, tx + 1, ty + 1);
 
-                // 스페셜이면 글자색을 검정이나 다른색으로?
+                // 스페셜이면 글자색을 검정이나 다른색으로? 일단 흰색 유지하되 잘보이게
+                // 스페셜이면 글자색을 흰색으로
                 if (cell.owner() == Team.SPECIAL) {
-                    g.setColor(Color.WHITE); // 흰색
+                    g.setColor(Color.WHITE); // [MODIFIED] 글자색 흰색
                 } else {
                     g.setColor(Color.WHITE);
                 }
@@ -244,6 +246,23 @@ public class BoardPanel extends JPanel {
         double progress() {
             double t = (System.currentTimeMillis() - startMs) / (double) ANIM_MS;
             return Math.min(1.0, t);
+        }
+    }
+
+    /**
+     * [NEW] 스페셜 칸 주변에 노란색 발광 효과(Glow)를 그립니다.
+     * 여러 겹의 반투명한 사각형을 겹쳐 그려서 빛이 퍼지는 느낌을 줍니다.
+     */
+    private void drawGlowingBorder(Graphics2D g, int x, int y, int w, int h) {
+        // 5단계로 투명도를 조절하며 테두리를 확장해서 그림
+        for (int i = 1; i <= 5; i++) {
+            // 바깥쪽으로 갈수록 투명해짐 (Alpha: 150 -> 줄어듦)
+            int alpha = Math.max(0, 150 - (i * 25));
+            g.setColor(new Color(255, 215, 0, alpha)); // Gold/Yellow 계열
+
+            // i 픽셀만큼 밖으로 확장 (Stroke를 굵게 하는 대신 drawRoundRect를 여러 번 호출)
+            // x-i, y-i 위치에서 w+2*i, h+2*i 크기로 그림
+            g.drawRoundRect(x - i, y - i, w + (i * 2), h + (i * 2), 14, 14);
         }
     }
 
