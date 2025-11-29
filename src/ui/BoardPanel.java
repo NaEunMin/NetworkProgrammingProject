@@ -1,10 +1,18 @@
+package ui;
 import javax.swing.*;
+
+import game.Board;
+import game.Cell;
+import game.GameModel;
+import game.Pos;
+import game.Team;
+import protocol.NetworkProtocol;
+
 import java.awt.*;
 import java.awt.geom.AffineTransform;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.awt.image.BufferedImage;
 import javax.imageio.ImageIO;
 import java.io.File;
 

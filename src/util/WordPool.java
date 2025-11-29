@@ -1,3 +1,4 @@
+package util;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -5,6 +6,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
+
+import game.Board;
 
 /**
  * 단어 공급기: word.txt(UTF-8) → 필터 → 섞은 뒤 순차 제공.

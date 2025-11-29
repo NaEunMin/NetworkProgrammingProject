@@ -1,11 +1,16 @@
+package ui;
 import javax.swing.*;
+
+import client.IGameClient;
+import game.GameModel;
+import game.Team;
+import protocol.NetworkProtocol;
+
 import java.awt.*;
 import java.io.File;
 import javax.imageio.ImageIO;
 import javax.sound.sampled.*;
 import javax.sound.sampled.LineEvent;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * 메인 프레임: 사진의 화면 구성을 Swing으로 재현.
@@ -137,7 +142,7 @@ public class GameFrame extends JFrame {
         bottom.add(inputPanel);
         refreshFlipLabels();
 
-        // [NEW] 보너스 게임 패널에 입력 영역(bottom)을 알려주어, 그 부분만 오버레이에서 제외
+        // [RESTORED] 보너스 게임 패널에 입력 영역(bottom)을 알려주어, 그 부분만 오버레이에서 제외
         bonusGamePanel.setInputArea(inputPanel);
 
         ImageIcon yellowTeamIcon = loadScaledIcon(yellowIconPath, 140, 180);
@@ -285,12 +290,14 @@ public class GameFrame extends JFrame {
         if (team != myTeam || model.secondsLeft() <= 0)
             return;
 
-        String input = field.getText();
+        String input = field.getText().trim();
         if (input == null || input.isBlank())
             return;
 
-        if (input.length() > 4)
+        // [MODIFIED] Refactored length check for readability
+        if (input.length() > 4 && !isBonusTime) {
             return;
+        }
 
         if (isBonusTime) {
             client.sendSentenceInput(team, input);
@@ -420,8 +427,11 @@ public class GameFrame extends JFrame {
      * (신규) 서버로부터 "문장 입력 결과" 메시지를 받았을 때
      */
     public void handleBonusSentenceResult(boolean success, String sentence, Team team) {
-        if (!isBonusTime)
+        System.out.println("GameFrame: Bonus Result - Success=" + success + ", Team=" + team + ", Sentence='" + sentence + "'");
+        if (!isBonusTime) {
+            System.out.println("GameFrame: Ignored Bonus Result (Not Bonus Time)");
             return;
+        }
 
         if (success) {
             model.addScore(team, 500);
