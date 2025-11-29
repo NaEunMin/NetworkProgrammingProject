@@ -1,4 +1,14 @@
+package client;
 import javax.swing.*;
+
+import game.*;
+import protocol.NetworkProtocol;
+import ui.GameFrame;
+import ui.LobbyFrame;
+import ui.WaitingRoomFrame;
+
+import util.WordPool;
+
 import java.awt.Color;
 import java.awt.Image;
 import java.awt.Dimension;
@@ -11,26 +21,31 @@ import java.net.SocketException;
 
 /**
  * 게임 클라이언트 (Swing 애플리케이션)
- * 1. 서버 접속 후 LobbyFrame(로비)을 띄운다.
- * 2. 별도 쓰레드로 서버 메시지 리스닝.
- * 3. 서버로부터 GameStart 메시지를 받으면 LobbyFrame을 숨기고 GameFrame을 연다.
- * 4. 게임 종료/중단 시 GameFrame을 닫고 LobbyFrame/대기방으로 복귀.
+ * 
+ * [설계]
+ * - 서버와 TCP 소켓 통신을 통해 실시간 멀티플레이 구현
+ * - ObjectInputStream/ObjectOutputStream으로 직렬화된 프로토콜 메시지 송수신
+ * - 별도의 리스너 스레드가 서버 메시지를 수신하고, SwingUtilities.invokeLater로 UI 갱신
+ *   (이유: Swing은 Single-Threaded 모델이므로 EDT에서만 UI 조작 가능)
+ * - 로비 → 대기방 → 게임방 순서로 화면 전환하며, 각 상태마다 적절한 UI만 표시
  */
 public class GameClient implements IGameClient {
 
     private static final int PORT = 12345;
 
+    // 네트워크 통신 관련
     private Socket socket;
-    private ObjectOutputStream oos;
+    private ObjectOutputStream oos;  // 주의: InputStream보다 먼저 생성해야 함 (헤더 전송 문제)
     private ObjectInputStream ois;
     private String nickname = "Player";
 
-    // UI
-    private LobbyFrame lobbyFrame; // 메인 로비 UI
-    private WaitingRoomFrame waitingRoomFrame; // 대기방 UI
-    private GameFrame gameFrame; // 실제 게임 UI
+    // UI (상태에 따라 하나씩만 활성화됨)
+    private LobbyFrame lobbyFrame;
+    private WaitingRoomFrame waitingRoomFrame;
+    private GameFrame gameFrame;
 
-    private GameModel localModel; // 서버와 동기화될 로컬 모델
+    // 게임 상태 (서버로부터 동기화됨)
+    private GameModel localModel;
     private java.util.List<NetworkProtocol.PlayerInfo> currentPlayers = new java.util.ArrayList<>();
 
     public void start() {

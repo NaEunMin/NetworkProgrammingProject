@@ -1,4 +1,8 @@
+package ui;
 import javax.swing.*;
+
+import client.GameClient;
+
 import java.awt.*;
 
 /**

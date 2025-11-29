@@ -1,5 +1,11 @@
+package ui;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+
+import client.GameClient;
+import game.SingleGameManager;
+import protocol.NetworkProtocol;
+
 import java.awt.*;
 import java.awt.image.BufferedImage;
 

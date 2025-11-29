@@ -1,4 +1,10 @@
+package ui;
 import javax.swing.*;
+
+import client.GameClient;
+import game.Team;
+import protocol.NetworkProtocol;
+
 import java.awt.*;
 
 /**

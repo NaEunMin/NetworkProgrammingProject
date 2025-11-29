@@ -1,8 +1,12 @@
+package game;
 import java.io.Serializable;
 
 /**
- * 보드의 "한 칸"을 이루는 최소 단위.
- * (중략)
+ * 보드의 "한 칸"을 나타내는 최소 단위
+ * 
+ * [가변 클래스로 설계]
+ * - 게임 중 소유권(owner)이 계속 변경될 수 있으므로 불변 객체로 만들 수 없음
+ * - record 대신 일반 class를 사용하여 setOwner() 메소드 제공
  * - 네트워크 전송을 위해 Serializable 구현
  */
 public class Cell implements Serializable {

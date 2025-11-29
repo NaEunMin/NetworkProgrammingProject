@@ -1,3 +1,4 @@
+package util;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -6,6 +7,12 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+
+/**
+ * - 보너스 게임용 문장 공급기.
+ * - 텍스트 파일(UTF-8)에서 문장 목록을 읽어온다.
+ * - 요청 시, 목록을 무작위로 섞어 지정된 개수의 문장을 제공한다.
+ */
 public class SentencePool {
 
     private final List<String> sentences;

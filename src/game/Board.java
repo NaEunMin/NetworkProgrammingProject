@@ -1,12 +1,15 @@
+package game;
 import java.io.Serializable;
 
 /**
- * 게임 보드 (R x C 격자).
- * - 각 칸(r, c)에 Cell 객체를 저장한다.
- * - 네트워크 전송을 위해 Serializable 구현
+ * 게임 보드 (R x C 격자)
+ * 
+ * [설계]
+ * - 2차원 배열로 격자를 표현 (직관적이고 O(1) 접근 가능)
+ * - 각 칸은 Cell 객체로 표현 (소유권과 토큰 문자 저장)
+ * - 네트워크 전송을 위해 Serializable 구현 (게임 시작 시 서버→클라이언트로 전송)
  */
 public class Board implements Serializable {
-    // 직렬화 ID
     private static final long serialVersionUID = 2L;
 
     private final Cell[][] cells;
