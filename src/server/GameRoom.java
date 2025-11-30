@@ -249,9 +249,14 @@ public class GameRoom {
 
                     int left = gameModel.secondsLeft();
 
-                    // 보너스 타임 시작 (10초 전)
-                    if (bonusEnabled && !bonusTimeActivated && left == 10) {
+                    // 보너스 타임 시작 (게임 시간의 절반이 지났을 때)
+                    if (bonusEnabled && !bonusTimeActivated && left == (durationSec / 2)) {
                         startBonusTime();
+                    }
+
+                    //5% 확률로 추가 점수 격자판(SPECIAL 칸) 생성
+                    if(bonusEnabled && Math.random() < 0.5){
+                        spawnSpecialItem();
                     }
 
                     // 게임 종료
@@ -358,14 +363,14 @@ public class GameRoom {
 
         broadcast(new NetworkProtocol.Msg_S2C_BonusTimeStart(bonusSentences));
 
-        // 10초 후 보너스 타임 종료
+        // 20초 후 보너스 타임 종료
         bonusTimer = new Timer(true);
         bonusTimer.schedule(new TimerTask() {
             @Override
             public void run() {
                 endBonusTime();
             }
-        }, 10000);
+        }, 20000);
     }
 
     /**
@@ -441,7 +446,7 @@ public class GameRoom {
 
         // 랜덤 위치 3개 선택
         java.util.Random rnd = new java.util.Random();
-        int specialCount = 3;
+        int specialCount = 1;
         for (int i = 0; i < specialCount; i++) {
             int r = rnd.nextInt(rows);
             int c = rnd.nextInt(cols);

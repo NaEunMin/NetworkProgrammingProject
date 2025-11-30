@@ -117,14 +117,21 @@ public class GameModel {
             // WordPool에서 다음 단어를 뽑아서 교체
             String newToken = wordPool.nextToken(oldToken);
 
+            // Cell 상태 반영
+            // 5% 확률로 보너스 격자판(SPECIAL) 생성
+            Team newOwner = myTeam;
+            if (Math.random() < 0.05) {
+                newOwner = Team.SPECIAL;
+            }
+
+            cell.setOwner(newOwner);
+            cell.setToken(newToken);
+            
             // 인덱스 업데이트 (이전 소유자 인덱스에서 제거, 새 소유자 인덱스에 추가)
             index.remove(prevOwner, oldToken, p);
-            index.add(myTeam, newToken, p);
+            index.add(newOwner, newToken, p);
 
-            // Cell 상태 반영
-            cell.setOwner(myTeam);
-            cell.setToken(newToken);
-            results.add(new FlipResult(p, prevOwner, myTeam, oldToken, newToken));
+            results.add(new FlipResult(p, prevOwner, newOwner, oldToken, newToken));
 
             // 점수 부여 (SPECIAL 칸은 3배)
             int score = 100;

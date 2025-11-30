@@ -52,8 +52,17 @@ public class BoardPanel extends JPanel {
         setOpaque(false); // 배경 투명 처리 (상위 패널 배경 사용)
 
         // 스페셜 아이템 이미지 로드
+        // 스페셜 아이템 이미지 로드 (파일 -> 리소스 순)
         try {
-            specialImg = ImageIO.read(new File("resources/images/treasure_chest.png"));
+            File f = new File("resources/images/treasure_chest.png");
+            if (f.exists()) {
+                specialImg = ImageIO.read(f);
+            } else {
+                java.net.URL res = getClass().getResource("/resources/images/treasure_chest.png");
+                if (res != null) {
+                    specialImg = ImageIO.read(res);
+                }
+            }
         } catch (Exception e) {
             System.err.println("Failed to load treasure_chest.png: " + e.getMessage());
         }
@@ -160,12 +169,18 @@ public class BoardPanel extends JPanel {
                 int offsetY = y + (CELL - h) / 2;
 
                 // 그리기: 스페셜 아이템(이미지) vs 일반 셀(Round Rect)
-                if (currentRenderTeam == Team.SPECIAL && specialImg != null) {
-                    int imgW = (int) (CELL * imgScaleX);
-                    int imgH = (int) (CELL * imgScaleY);
-                    int imgOffsetX = x + (CELL - imgW) / 2;
-                    int imgOffsetY = y + (CELL - imgH) / 2;
-                    g.drawImage(specialImg, imgOffsetX, imgOffsetY, imgW, imgH, null);
+                if (currentRenderTeam == Team.SPECIAL) {
+                    if (specialImg != null) {
+                        int imgW = (int) (CELL * imgScaleX);
+                        int imgH = (int) (CELL * imgScaleY);
+                        int imgOffsetX = x + (CELL - imgW) / 2;
+                        int imgOffsetY = y + (CELL - imgH) / 2;
+                        g.drawImage(specialImg, imgOffsetX, imgOffsetY, imgW, imgH, null);
+                    } else {
+                        // Fallback: 이미지가 없으면 노란색 원으로 표시
+                        g.setColor(Color.YELLOW);
+                        g.fillOval(offsetX, offsetY, w, h);
+                    }
                 } else {
                     g.setColor(drawColor);
                     g.fillRoundRect(offsetX, offsetY, w, h, 10, 10);
