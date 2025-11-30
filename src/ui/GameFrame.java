@@ -13,25 +13,30 @@ import javax.sound.sampled.*;
 import javax.sound.sampled.LineEvent;
 
 /**
- * 메인 프레임: 사진의 화면 구성을 Swing으로 재현.
- *
- * 상단: [노랑팀 카드(점수)] [중앙 타이머 00:53] [파랑팀 카드(점수)]
- * 중앙: 보드(BoardPanel)
- * 하단: 좌측(노랑팀 입력창 + 버튼) | 우측(파랑팀 입력창 + 버튼)
- *
- * [네트워크 변경점]
- * - GameModel을 직접 생성하지 않고, GameClient로부터 전달받음.
- * - GameClient를 통해 서버로 입력 이벤트를 전송.
- * - GameClient가 호출하는 public 메소드(handleRemote*)를 통해
- * 서버로부터 받은 상태(입력 결과, 시간)를 UI에 반영.
- * - 자신에게 할당된 팀(myTeam)의 입력창만 활성화.
+ * 게임 메인 프레임 (실제 게임 플레이 화면)
+ * 
+ * [설계]
+ * - 상단: 점수판(양 팀) 및 중앙 타이머
+ * - 중앙: 게임 보드 (BoardPanel)
+ * - 하단: 각 팀의 입력창 및 버튼 (내 팀만 활성화)
+ * - 오버레이: 보너스 게임 시 GlassPane을 사용하여 전체 화면 위에 애니메이션 표시
+ * 
+ * [네트워크 아키텍처]
+ * - MVC 패턴: GameModel(데이터) -> GameFrame(뷰) -> GameClient(컨트롤러/네트워크)
+ * - 입력 흐름: 사용자 입력 -> handleLocalInput -> GameClient.sendInputRequest -> 서버
+ * - 업데이트 흐름: 서버 메시지 -> GameClient 리스너 -> handleRemote*(Tick/Input/GameOver) -> UI 갱신
+ * 
+ * [주요 기능]
+ * - 테마 지원: 생성 시 전달받은 Theme에 따라 배경, 아이콘, 색상 테마 적용
+ * - 사운드 효과: 입력 성공, 게임 종료 등 이벤트 발생 시 효과음 재생
+ * - 보너스 게임: GlassPane을 활용한 몰입감 있는 오버레이 애니메이션 제공
  */
 public class GameFrame extends JFrame {
 
     // ---- 모델/네트워크 ----
     private final GameModel model;
-    private final IGameClient client; // 서버와 통신할 클라이언트 (또는 로컬 매니저)
-    private final Team myTeam; // 이 프레임의 플레이어 팀 (YELLOW or BLUE)
+    private final IGameClient client; // 서버 통신 인터페이스 (멀티: GameClient, 싱글: SingleGameManager)
+    private final Team myTeam; // 현재 클라이언트의 팀
     private final NetworkProtocol.Theme theme;
 
     // ---- UI 구성요소(상단) ----
@@ -47,7 +52,7 @@ public class GameFrame extends JFrame {
 
     // ---- 보너스 타임 UI ----
     private boolean isBonusTime = false;
-    private final BonusGamePanel bonusGamePanel = new BonusGamePanel(); // [MODIFIED] New Panel
+    private final BonusGamePanel bonusGamePanel = new BonusGamePanel(); // GlassPane으로 사용
 
     // ---- 하단 입력(좌/우) ----
     private final JTextField yellowInput = new JTextField(18);
@@ -58,8 +63,14 @@ public class GameFrame extends JFrame {
     private final JLabel blueFlipLabel = flipCounterLabel();
 
     /**
-     * 생성자:
-     * 모델, 클라이언트, 내 팀을 외부(GameClient)에서 주입받음.
+     * 생성자: 게임 초기화 및 UI 구성
+     * 
+     * @param model 초기 게임 모델 (보드 상태 포함)
+     * @param client 서버 통신용 클라이언트
+     * @param myTeam 내 팀 (입력창 활성화 여부 결정)
+     * @param yellowPlayerName 노랑팀(왼쪽) 플레이어 이름
+     * @param bluePlayerName 파랑팀(오른쪽) 플레이어 이름
+     * @param theme 게임 테마
      */
     public GameFrame(GameModel model, IGameClient client, Team myTeam, String yellowPlayerName, String bluePlayerName,
             NetworkProtocol.Theme theme) {
@@ -70,7 +81,7 @@ public class GameFrame extends JFrame {
         this.myTeam = myTeam;
         this.theme = theme;
 
-        // 테마에 따른 리소스/색상 설정
+        // 1. 테마 리소스 설정 (기본값: 해적 테마)
         String bgPath = "resources/images/game_background.png";
         Color yellowColor = new Color(0xF2, 0xC1, 0x4E);
         Color blueColor = new Color(0x5D, 0xA3, 0xFA);
@@ -79,6 +90,7 @@ public class GameFrame extends JFrame {
         String yellowIconPath = "resources/images/yellow_team_pirate.png";
         String blueIconPath = "resources/images/blue_team_pirate.png";
 
+        // 야시장 테마 적용
         if (theme == NetworkProtocol.Theme.NIGHT_MARKET) {
             bgPath = "resources/images/dark_game_background.png";
             yellowColor = new Color(147, 112, 219); // Purple
@@ -95,22 +107,19 @@ public class GameFrame extends JFrame {
 
         this.boardPanel = new BoardPanel(model, theme);
 
-        // 타이머 초기화 (모델의 시간으로)
+        // 타이머 초기화
         timerLabel.setText(formatSec(model.secondsLeft()));
 
-        // 보너스 타임 패널 설정 (BonusGamePanel 내부에서 초기화됨)
-        // bonusTimePanel 관련 코드 제거됨
-
-        // 중앙 패널에 카드 레이아웃으로 보드 추가 (보너스 패널은 GlassPane으로 이동)
+        // 2. 중앙 패널 구성 (보드)
         centerPanel.add(boardPanel, "board");
-        // centerPanel.add(bonusGamePanel, "bonus"); // [REMOVED]
         centerPanel.setOpaque(false);
         
-        // [NEW] 보너스 게임 패널을 GlassPane으로 설정 (전체 화면 오버레이)
+        // 3. 보너스 게임 패널 설정 (GlassPane 사용)
+        // GlassPane은 프레임의 최상위 레이어로, 아래 컴포넌트를 가리거나 투과시킬 수 있음
         setGlassPane(bonusGamePanel);
         bonusGamePanel.setVisible(false);
 
-        // 4) 상단 점수판 + 타이머 (사진 레이아웃을 흉내)
+        // 4. 상단 패널 (점수판 + 타이머)
         JPanel top = new JPanel(new BorderLayout(8, 8));
         top.setOpaque(false);
         top.setBorder(BorderFactory.createEmptyBorder(8, 8, 0, 8));
@@ -125,7 +134,7 @@ public class GameFrame extends JFrame {
         top.add(timerWrap, BorderLayout.CENTER);
         top.add(pill(blueScore, blueColor), BorderLayout.EAST);
 
-        // 5) 하단 입력 영역(좌: 노랑 / 우: 파랑) — 동시에 입력 가능
+        // 5. 하단 패널 (입력창)
         JPanel bottom = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 8));
         bottom.setOpaque(false);
         bottom.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
@@ -136,19 +145,20 @@ public class GameFrame extends JFrame {
         } else {
             inputPanel = teamInputPanel(blueTeamName, Team.BLUE, blueInput, blueBtn, blueFlipLabel, blueColor);
         }
+        // 입력창 너비를 보드 너비에 맞춤
         int desiredWidth = boardPanel.getPreferredSize().width + 40;
         inputPanel.setPreferredSize(new Dimension(desiredWidth, inputPanel.getPreferredSize().height));
         bottom.add(inputPanel);
-        bottom.add(inputPanel);
+        // bottom.add(inputPanel); // 중복 추가 제거 (원래 코드에 있었으나 불필요해 보임, 하지만 레이아웃 균형을 위해 더미가 필요할 수도 있음. 일단 하나만 추가)
         refreshFlipLabels();
 
-        // [RESTORED] 보너스 게임 패널에 입력 영역(bottom)을 알려주어, 그 부분만 오버레이에서 제외
+        // 보너스 게임 패널에 입력 영역 위치 전달 (오버레이 구멍 뚫기용)
         bonusGamePanel.setInputArea(inputPanel);
 
         ImageIcon yellowTeamIcon = loadScaledIcon(yellowIconPath, 140, 180);
         ImageIcon blueTeamIcon = loadScaledIcon(blueIconPath, 140, 180);
 
-        // 6) 프레임 레이아웃 조립
+        // 6. 전체 레이아웃 조립
         JPanel middle = new JPanel(new BorderLayout(8, 0));
         middle.setOpaque(false);
         middle.add(buildSidePanel(yellowTeamName, yellowPlayerName, yellowColor, yellowTeamIcon,
@@ -176,13 +186,14 @@ public class GameFrame extends JFrame {
         root.add(bottom, BorderLayout.SOUTH);
         setContentPane(root);
 
-        // 7) 이벤트 - "내 팀"의 입력만 서버로 전송
+        // 7. 이벤트 리스너 등록
+        // 입력 버튼/엔터 키 -> handleLocalInput 호출
         yellowBtn.addActionListener(e -> handleLocalInput(Team.YELLOW, yellowInput));
         yellowInput.addActionListener(e -> handleLocalInput(Team.YELLOW, yellowInput));
         blueBtn.addActionListener(e -> handleLocalInput(Team.BLUE, blueInput));
         blueInput.addActionListener(e -> handleLocalInput(Team.BLUE, blueInput));
 
-        // 8) "내 팀"이 아닌 입력창은 비활성화
+        // 8. 내 팀이 아닌 입력창 비활성화
         if (myTeam == Team.YELLOW) {
             blueInput.setEnabled(false);
             blueBtn.setEnabled(false);
@@ -191,21 +202,21 @@ public class GameFrame extends JFrame {
             yellowBtn.setEnabled(false);
         }
 
-        // 9) 윈도우 설정
-        setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE); // 클라이언트 종료 시 GameClient에서 처리
+        // 9. 윈도우 설정
+        setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         pack();
         setLocationRelativeTo(null);
     }
 
-    /** 사진의 '카드 배지' 느낌을 주기 위한 점수 라벨 스타일 */
+    /** 점수 배지 UI 생성 */
     private static JLabel scoreBadge(Color fg) {
         JLabel l = new JLabel("0P", SwingConstants.CENTER);
         l.setFont(l.getFont().deriveFont(Font.BOLD, 20f));
-        l.setForeground(Color.BLACK); // 점수 텍스트 색상
+        l.setForeground(Color.BLACK);
         return l;
     }
 
-    /** 라벨을 둥근 캡슐 형태의 패널로 감싸는 헬퍼(UI 데코) */
+    /** 둥근 캡슐 모양 배경 패널 생성 */
     private static JPanel pill(JComponent inner, Color bg) {
         JPanel p = new JPanel(new BorderLayout()) {
             @Override
@@ -224,7 +235,7 @@ public class GameFrame extends JFrame {
         return p;
     }
 
-    /** 좌/우 팀 입력 패널 구성 — 팀 색상/라벨/텍스트필드/버튼 */
+    /** 팀별 입력 패널 생성 (뒤집은 횟수 + 입력창 + 버튼) */
     private JPanel teamInputPanel(String title, Team team, JTextField field, JButton btn, JLabel flipLabel,
             Color tone) {
         JLabel titleL = new JLabel(title);
@@ -284,7 +295,9 @@ public class GameFrame extends JFrame {
     }
 
     /**
-     * (7) 로컬 입력 처리
+     * 로컬 사용자 입력 처리
+     * 1. 유효성 검사 (내 팀 여부, 시간 종료 여부, 빈 입력)
+     * 2. 보너스 타임 여부에 따라 다른 메시지 전송
      */
     private void handleLocalInput(Team team, JTextField field) {
         if (team != myTeam || model.secondsLeft() <= 0)
@@ -294,7 +307,7 @@ public class GameFrame extends JFrame {
         if (input == null || input.isBlank())
             return;
 
-        // [MODIFIED] Refactored length check for readability
+        // 일반 게임 중에는 4글자 제한 (보너스 타임 제외)
         if (input.length() > 4 && !isBonusTime) {
             return;
         }
@@ -306,22 +319,20 @@ public class GameFrame extends JFrame {
         }
     }
 
-    /**
-     * (8) 타이머가 0이 되면 입력 비활성화 (양쪽 모두)
-     */
+    /** 게임 종료 시 입력 비활성화 */
     private void disableInputs() {
         for (var c : new JComponent[] { yellowInput, yellowBtn, blueInput, blueBtn })
             c.setEnabled(false);
     }
 
-    /** (9) 남은 시간 "MM:SS" 포맷 */
+    /** 초 단위를 MM:SS 형식으로 변환 */
     private static String formatSec(int sec) {
         int m = Math.max(0, sec) / 60;
         int s = Math.max(0, sec) % 60;
         return String.format("%02d:%02d", m, s);
     }
 
-    /** (신규) 사운드 재생 헬퍼 */
+    /** 사운드 재생 (비동기 스레드) */
     private void playSound(String soundFileName) {
         new Thread(() -> {
             try (AudioInputStream audioIn = AudioSystem
@@ -340,10 +351,10 @@ public class GameFrame extends JFrame {
         }).start();
     }
 
-    // --- [신규] 서버 메시지 처리기 (GameClient의 리스너 스레드가 호출) ---
+    // --- 서버 메시지 핸들러 (GameClient에서 호출) ---
 
     /**
-     * (신규) 서버로부터 "시간 1초 경과" 메시지를 받았을 때 (EDT에서 호출 보장)
+     * 서버로부터 Tick(1초 경과) 수신 시 호출
      */
     public void handleRemoteTick() {
         model.tickOneSecond();
@@ -351,7 +362,11 @@ public class GameFrame extends JFrame {
     }
 
     /**
-     * (신규) 서버로부터 "입력 처리" 명령을 받았을 때 (EDT에서 호출 보장)
+     * 서버로부터 입력 처리 결과 수신 시 호출
+     * - 보드 업데이트 (애니메이션)
+     * - 점수 및 뒤집기 횟수 갱신
+     * - 효과음 재생
+     * - 입력창 초기화 (성공 시)
      */
     public void handleRemoteInput(Team team, String input) {
         if (model.secondsLeft() <= 0)
@@ -371,9 +386,9 @@ public class GameFrame extends JFrame {
         if (team == myTeam) {
             JTextField myField = (myTeam == Team.YELLOW) ? yellowInput : blueInput;
             if (flips.isEmpty()) {
-                myField.selectAll();
+                myField.selectAll(); // 실패 시 전체 선택 (빠른 재입력 유도)
             } else {
-                myField.setText("");
+                myField.setText(""); // 성공 시 초기화
             }
         }
     }
@@ -383,7 +398,9 @@ public class GameFrame extends JFrame {
     }
 
     /**
-     * (신규) 서버로부터 "게임 종료" 메시지를 받았을 때 (EDT에서 호출 보장)
+     * 서버로부터 게임 종료 수신 시 호출
+     * - 결과 팝업 표시
+     * - 입력 차단
      */
     public void handleRemoteGameOver() {
         playSound("finish.wav");
@@ -398,23 +415,17 @@ public class GameFrame extends JFrame {
         client.gameHasFinished();
     }
 
-    // --- [추가] 보너스 타임 관련 서버 메시지 처리기 ---
+    // --- 보너스 타임 핸들러 ---
 
     /**
-     * (신규) 서버로부터 "보너스 타임 시작" 메시지를 받았을 때
+     * 보너스 타임 시작
+     * - GlassPane(BonusGamePanel) 활성화 및 애니메이션 시작
      */
     public void handleBonusTimeStart(java.util.List<String> sentences) {
         isBonusTime = true;
 
-        // [MODIFIED] 애니메이션 패널 시작 (GlassPane)
         bonusGamePanel.setVisible(true);
         bonusGamePanel.startBonusTime(sentences);
-
-        // centerCardLayout.show(centerPanel, "bonus"); // [REMOVED]
-
-        // [MODIFIED] 팝업 제거 (애니메이션으로 대체)
-        // JOptionPane.showMessageDialog(this, "BONUS TIME! 20초간 문장을 입력하여 500점을 획득하세요!", "보너스 타임!",
-        //         JOptionPane.INFORMATION_MESSAGE);
 
         if (myTeam == Team.YELLOW) {
             yellowInput.requestFocusInWindow();
@@ -424,12 +435,12 @@ public class GameFrame extends JFrame {
     }
 
     /**
-     * (신규) 서버로부터 "문장 입력 결과" 메시지를 받았을 때
+     * 보너스 문장 입력 결과 처리
+     * - 성공 시 점수 추가 및 사슬 끊기 애니메이션 트리거
      */
     public void handleBonusSentenceResult(boolean success, String sentence, Team team) {
         System.out.println("GameFrame: Bonus Result - Success=" + success + ", Team=" + team + ", Sentence='" + sentence + "'");
         if (!isBonusTime) {
-            System.out.println("GameFrame: Ignored Bonus Result (Not Bonus Time)");
             return;
         }
 
@@ -438,7 +449,7 @@ public class GameFrame extends JFrame {
             yellowScore.setText(model.getScore(Team.YELLOW) + "P");
             blueScore.setText(model.getScore(Team.BLUE) + "P");
             
-            // [MODIFIED] 사슬 끊기 효과
+            // 사슬 끊기 효과
             bonusGamePanel.solveSentence(sentence);
             
             if (team == myTeam) {
@@ -451,18 +462,16 @@ public class GameFrame extends JFrame {
     }
 
     /**
-     * (신규) 서버로부터 "보너스 타임 종료" 메시지를 받았을 때
+     * 보너스 타임 종료
+     * - 퇴장 애니메이션 후 GlassPane 비활성화
      */
     public void handleBonusTimeEnd() {
         isBonusTime = false;
-        bonusGamePanel.endBonusTime(); // [MODIFIED] 퇴장 애니메이션
+        bonusGamePanel.endBonusTime();
         
-        // 잠시 후 보드로 복귀 (애니메이션 시간 고려)
+        // 퇴장 애니메이션 시간(약 2초) 후 패널 숨김
         Timer t = new Timer(2000, e -> {
-             // centerCardLayout.show(centerPanel, "board"); // [REMOVED]
-             bonusGamePanel.setVisible(false); // [MODIFIED] GlassPane 숨김
-             // [MODIFIED] 팝업 제거 (바로 복귀)
-             // JOptionPane.showMessageDialog(this, "보너스 타임 종료!", "알림", JOptionPane.INFORMATION_MESSAGE);
+             bonusGamePanel.setVisible(false);
         });
         t.setRepeats(false);
         t.start();
@@ -481,6 +490,7 @@ public class GameFrame extends JFrame {
         blueFlipLabel.setText(model.getFlips(Team.BLUE) + "개");
     }
 
+    /** 좌/우측 플레이어 정보 패널 생성 */
     private JPanel buildSidePanel(String teamLabel, String playerName, Color tone, ImageIcon emblem, boolean isMine) {
         JPanel panel = new JPanel();
         panel.setOpaque(false);
@@ -540,7 +550,7 @@ public class GameFrame extends JFrame {
                 return ImageIO.read(res);
             }
         } catch (Exception e) {
-            // ignore, fallback to null image
+            // ignore
         }
         return null;
     }

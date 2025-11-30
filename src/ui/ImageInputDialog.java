@@ -9,14 +9,32 @@ import java.awt.geom.AffineTransform;
 import java.io.File;
 
 /**
- * 이미지 배경을 사용하는 간단한 입력 다이얼로그.
- * - 이미지가 없으면 자동으로 `JOptionPane`로 폴백합니다.
- * - `flip`을 true로 하면 이미지를 좌우 반전합니다.
+ * 이미지 배경을 가진 커스텀 입력 다이얼로그
+ * 
+ * [설계 목적]
+ * - 게임의 몰입감을 위해 기본 JOptionPane 대신 테마에 맞는 이미지를 배경으로 하는 입력창 제공
+ * - 닉네임 입력 등 초기 진입 시 사용됨
+ * 
+ * [주요 기능]
+ * - 이미지 로딩: 절대 경로, 상대 경로, 클래스패스 순으로 유연하게 이미지 검색
+ * - 폴백(Fallback): 이미지 로드 실패 시 자동으로 기본 JOptionPane 사용
+ * - 커스텀 UI: 윈도우 장식(TitleBar)을 제거하고 직접 구현하여 게임 분위기와 통일
+ * - 스레드 안전성: invokeAndWait를 사용하여 어느 스레드에서 호출하든 EDT에서 실행 보장
  */
 public class ImageInputDialog {
 
+    /**
+     * 다이얼로그 표시 및 입력값 반환
+     * 
+     * @param parent 부모 컴포넌트
+     * @param message 표시할 메시지
+     * @param initialValue 초기 입력값
+     * @param imagePath 배경 이미지 경로
+     * @param flip 이미지 좌우 반전 여부
+     * @return 입력된 문자열 (취소 시 null)
+     */
     public static String showInputDialog(Component parent, String message, String initialValue, String imagePath, boolean flip) {
-        // Try loading image from several locations so dialog works regardless of working dir.
+        // 1. 이미지 로딩 시도 (여러 경로 탐색)
         BufferedImage loaded = null;
         try {
             File f = new File(imagePath);
@@ -45,12 +63,13 @@ public class ImageInputDialog {
             System.err.println("ImageInputDialog: error while loading image: " + e.getMessage());
         }
 
+        // 이미지가 없으면 기본 다이얼로그로 폴백
         if (loaded == null) {
             System.out.println("ImageInputDialog: no image found, falling back to JOptionPane");
             return JOptionPane.showInputDialog(parent, message, initialValue);
         }
 
-        // Optionally flip horizontally
+        // 2. 이미지 전처리 (좌우 반전 등)
         BufferedImage imgToShow = loaded;
         if (flip) {
             try {
@@ -65,16 +84,17 @@ public class ImageInputDialog {
         }
 
         final BufferedImage finalImg = imgToShow;
-        final String[] result = new String[1];
+        final String[] result = new String[1]; // 결과값을 담을 배열 (람다 내부에서 접근 위해)
 
         try {
+            // EDT에서 UI 생성 및 표시
             SwingUtilities.invokeAndWait(() -> {
                 Window owner = (parent instanceof Component) ? SwingUtilities.getWindowAncestor((Component) parent) : null;
                 final JDialog dlg = new JDialog(owner, Dialog.ModalityType.APPLICATION_MODAL);
-                dlg.setUndecorated(true);
+                dlg.setUndecorated(true); // 기본 윈도우 테두리 제거
                 dlg.setResizable(false);
 
-                // Custom title bar (to mimic the screenshot: title + close X)
+                // 커스텀 타이틀바 구현 (드래그 이동 지원)
                 JPanel titleBar = new JPanel(new BorderLayout());
                 titleBar.setBackground(new Color(240,240,240,230));
                 titleBar.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, new Color(200,200,200)));
@@ -95,7 +115,7 @@ public class ImageInputDialog {
                 closeBtn.setPreferredSize(new Dimension(34, 34));
                 titleBar.add(closeBtn, BorderLayout.EAST);
 
-                // Drag support for title bar
+                // 타이틀바 드래그로 창 이동 구현
                 final Point[] dragOffset = {new Point()};
                 titleBar.addMouseListener(new MouseAdapter() {
                     public void mousePressed(MouseEvent e) {
@@ -109,12 +129,13 @@ public class ImageInputDialog {
                     }
                 });
 
+                // 이미지 패널 (배경 그리기)
                 JPanel imagePanel = new JPanel() {
                     @Override
                     protected void paintComponent(Graphics g) {
                         super.paintComponent(g);
                         if (finalImg != null) {
-                            // scale image preserving aspect ratio and center it
+                            // 이미지 비율 유지하며 화면에 꽉 차게 그리기 (최대 크기 제한)
                             int imgW = finalImg.getWidth();
                             int imgH = finalImg.getHeight();
                             Dimension screen = Toolkit.getDefaultToolkit().getScreenSize();
@@ -131,7 +152,7 @@ public class ImageInputDialog {
                 };
                 imagePanel.setLayout(new GridBagLayout());
 
-                // input area: use a small semi-transparent panel centered over the image
+                // 입력 패널 (반투명 배경)
                 GridBagConstraints gbc = new GridBagConstraints();
                 gbc.gridx = 0;
                 gbc.gridy = 0;
@@ -140,7 +161,7 @@ public class ImageInputDialog {
 
                 JPanel inputWrapper = new JPanel(new GridBagLayout());
                 inputWrapper.setOpaque(true);
-                inputWrapper.setBackground(new Color(255, 255, 255, 200));
+                inputWrapper.setBackground(new Color(255, 255, 255, 200)); // 반투명 흰색
                 inputWrapper.setBorder(BorderFactory.createLineBorder(Color.GRAY));
 
                 GridBagConstraints igbc = new GridBagConstraints();
@@ -166,12 +187,12 @@ public class ImageInputDialog {
 
                 imagePanel.add(inputWrapper, gbc);
 
-                // container: put title bar on top and image panel center
+                // 전체 컨테이너 구성
                 JPanel container = new JPanel(new BorderLayout());
                 container.add(titleBar, BorderLayout.NORTH);
                 container.add(imagePanel, BorderLayout.CENTER);
 
-                // close button action
+                // 이벤트 핸들러
                 closeBtn.addActionListener(a -> {
                     result[0] = null;
                     dlg.dispose();
@@ -187,7 +208,8 @@ public class ImageInputDialog {
                 });
 
                 dlg.getContentPane().add(container);
-                // choose dialog size based on scaled image but ensure minimums
+                
+                // 다이얼로그 크기 설정 (이미지 크기에 맞춤)
                 Dimension screen = Toolkit.getDefaultToolkit().getScreenSize();
                 int maxW = (int) (screen.width * 0.8);
                 int maxH = (int) (screen.height * 0.8);
@@ -198,6 +220,8 @@ public class ImageInputDialog {
                 int dialogH = Math.max(320, (int) (imgH * scale));
                 dlg.setSize(dialogW, dialogH);
                 dlg.setLocationRelativeTo(parent);
+                
+                // 창이 열리면 텍스트 필드에 포커스
                 dlg.addWindowListener(new WindowAdapter() {
                     @Override
                     public void windowOpened(WindowEvent e) {

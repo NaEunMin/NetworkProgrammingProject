@@ -10,7 +10,18 @@ import java.awt.*;
 import java.util.List;
 
 /**
- * 대기방 화면: 팀 슬롯, 방 정보, 채팅 UI
+ * 대기방 화면 (게임 시작 전 준비 공간)
+ * 
+ * [설계]
+ * - 좌측: 방 정보 (이름, 시간, 테마 등) 표시
+ * - 중앙: 팀 슬롯 (YELLOW/BLUE) 및 플레이어 상태 (준비/방장) 표시
+ * - 우측: 대기방 채팅 UI
+ * - 하단: 나가기, 준비, 시작 버튼
+ * 
+ * [UI 특징]
+ * - 테마(Theme)에 따라 배경 이미지와 팀 색상/이름이 동적으로 변경됨
+ *   (예: 야시장 테마 -> 보라/주황 팀, 어두운 배경)
+ * - 방장(Owner)에게만 '게임 시작' 버튼 활성화 (모든 플레이어가 준비 완료 시)
  */
 public class WaitingRoomFrame extends JFrame {
 
@@ -40,9 +51,9 @@ public class WaitingRoomFrame extends JFrame {
 
         setSize(920, 620);
         setLocationRelativeTo(null);
-        setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
+        setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE); // 닫기 버튼 클릭 시 별도 처리
 
-        // 이미지 로드
+        // 테마에 따른 배경 이미지 로드
         try {
             String bgPath = "resources/images/waiting_room_background_pirate.png";
             if (roomInfo.theme() == NetworkProtocol.Theme.NIGHT_MARKET) {
@@ -53,6 +64,7 @@ public class WaitingRoomFrame extends JFrame {
             e.printStackTrace();
         }
 
+        // 창 닫기 시 방 나가기 요청 전송
         addWindowListener(new java.awt.event.WindowAdapter() {
             @Override
             public void windowClosing(java.awt.event.WindowEvent e) {
@@ -64,6 +76,10 @@ public class WaitingRoomFrame extends JFrame {
         updatePlayers(players);
     }
 
+    /**
+     * 전체 레이아웃 구성
+     * - BorderLayout 사용: West(정보), Center(팀 슬롯), East(채팅)
+     */
     private JPanel buildContent() {
         JPanel root = new JPanel(new BorderLayout(12, 12)) {
             @Override
@@ -75,7 +91,6 @@ public class WaitingRoomFrame extends JFrame {
             }
         };
         root.setBorder(new EmptyBorder(12, 12, 12, 12));
-        // root.setBackground(new Color(19, 44, 68)); // 이미지 사용
 
         root.add(buildInfoPanel(), BorderLayout.WEST);
         root.add(buildCenterPanel(), BorderLayout.CENTER);
@@ -84,6 +99,9 @@ public class WaitingRoomFrame extends JFrame {
         return root;
     }
 
+    /**
+     * 좌측 방 정보 패널
+     */
     private JPanel buildInfoPanel() {
         JPanel info = new JPanel() {
             @Override
@@ -124,6 +142,10 @@ public class WaitingRoomFrame extends JFrame {
         return info;
     }
 
+    /**
+     * 중앙 팀 슬롯 및 버튼 패널
+     * - 테마에 따라 팀 색상과 이름이 변경됨
+     */
     private JPanel buildCenterPanel() {
         JPanel center = new JPanel(new BorderLayout());
         center.setOpaque(false);
@@ -136,6 +158,7 @@ public class WaitingRoomFrame extends JFrame {
         Color yellowColor = new Color(250, 215, 120);
         Color blueColor = new Color(140, 190, 255);
 
+        // 테마별 색상/이름 커스터마이징
         if (roomInfo.theme() == NetworkProtocol.Theme.NIGHT_MARKET) {
             yellowLabel = "보라팀"; // YELLOW(Left) -> Purple
             blueLabel = "주황팀"; // BLUE(Right) -> Orange
@@ -152,12 +175,13 @@ public class WaitingRoomFrame extends JFrame {
         teams.add(yellowPanel);
         teams.add(bluePanel);
 
+        // 하단 버튼 (나가기, 준비, 시작)
         JPanel bottomButtons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 8));
         bottomButtons.setOpaque(false);
         JButton leaveButton = new JButton("방 나가기");
         readyButton = new JButton("준비!");
         startButton = new JButton("게임 시작");
-        startButton.setEnabled(false);
+        startButton.setEnabled(false); // 기본 비활성화 (조건 충족 시 활성화)
         bottomButtons.add(leaveButton);
         bottomButtons.add(readyButton);
         bottomButtons.add(startButton);
@@ -171,6 +195,9 @@ public class WaitingRoomFrame extends JFrame {
         return center;
     }
 
+    /**
+     * 팀 슬롯 래퍼 (헤더 + 슬롯 내용)
+     */
     private JPanel wrapSlot(String title, JLabel slot, Color headerColor) {
         JPanel panel = new JPanel(new BorderLayout()) {
             @Override
@@ -214,6 +241,9 @@ public class WaitingRoomFrame extends JFrame {
         return label;
     }
 
+    /**
+     * 우측 채팅 패널
+     */
     private JPanel buildChatPanel() {
         JPanel chatPanel = new JPanel(new BorderLayout(8, 8)) {
             @Override
@@ -266,7 +296,12 @@ public class WaitingRoomFrame extends JFrame {
         chatInput.setText("");
     }
 
-    /** 서버에서 받은 플레이어 목록 업데이트 */
+    /**
+     * 서버에서 받은 플레이어 목록 업데이트
+     * - 각 슬롯에 플레이어 이름 표시
+     * - 준비 상태 및 방장 여부 확인
+     * - 게임 시작 버튼 활성화 여부 결정
+     */
     public void updatePlayers(List<NetworkProtocol.PlayerInfo> players) {
         String yellowName = "빈 자리";
         String blueName = "빈 자리";
@@ -292,6 +327,7 @@ public class WaitingRoomFrame extends JFrame {
 
         readyButton.setText(amReady ? "준비 해제" : "준비!");
 
+        // 시작 조건: 2명 이상이고 모두 준비 완료 상태일 때
         boolean allReady = players.size() >= 2 && players.stream().allMatch(NetworkProtocol.PlayerInfo::ready);
         startButton.setVisible(iAmOwner);
         startButton.setEnabled(iAmOwner && allReady);

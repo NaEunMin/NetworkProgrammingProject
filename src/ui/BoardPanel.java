@@ -17,39 +17,53 @@ import javax.imageio.ImageIO;
 import java.io.File;
 
 /**
- * 중앙 보드 패널. 뒤집기 애니메이션을 앞/뒷면 전환처럼 보이도록 조정.
+ * 게임 보드 렌더링 및 애니메이션 패널
+ * 
+ * [설계]
+ * - JPanel의 paintComponent를 오버라이드하여 커스텀 그래픽 구현
+ * - 60fps 타이머를 사용하여 부드러운 뒤집기 애니메이션 처리
+ * - 텍스트 자동 크기 조절(fitTextToCell)로 다양한 길이의 단어 대응
+ * 
+ * [시각 효과]
+ * - 뒤집기 애니메이션: 코사인 함수를 이용한 3D 회전 효과 (scaleX 조절)
+ * - 색상 보간(Lerp): 팀 색상 간 부드러운 전환
+ * - 스페셜 아이템: 이미지 렌더링 및 발광(Glow)/반짝임(Sparkle) 효과
  */
 public class BoardPanel extends JPanel {
 
-    private static final int CELL = 56;
-    private static final int PAD = 14;
-    private static final Color GRID = new Color(0, 0, 0, 40);
-    private static final int ANIM_MS = 260;
+    private static final int CELL = 56; // 셀 크기
+    private static final int PAD = 14;  // 패딩
+    private static final Color GRID = new Color(0, 0, 0, 40); // 격자 색상
+    private static final int ANIM_MS = 260; // 애니메이션 지속 시간
 
     private final GameModel model;
-    private final NetworkProtocol.Theme theme; // [NEW]
+    private final NetworkProtocol.Theme theme;
+    
+    // 진행 중인 애니메이션 관리 (Thread-safe Map)
     private final Map<Pos, FlipAnim> animations = new ConcurrentHashMap<>();
     private final javax.swing.Timer animTimer;
+    
     private Image specialImg;
 
     public BoardPanel(GameModel model, NetworkProtocol.Theme theme) {
         this.model = model;
         this.theme = theme;
         setBackground(new Color(19, 36, 49));
-        setOpaque(false);
+        setOpaque(false); // 배경 투명 처리 (상위 패널 배경 사용)
 
-        // Load special item image
+        // 스페셜 아이템 이미지 로드
         try {
             specialImg = ImageIO.read(new File("resources/images/treasure_chest.png"));
         } catch (Exception e) {
             System.err.println("Failed to load treasure_chest.png: " + e.getMessage());
         }
 
+        // 애니메이션 타이머 (약 60fps)
         javax.swing.Timer t = new javax.swing.Timer(16, e -> {
             if (animations.isEmpty()) {
                 ((javax.swing.Timer) e.getSource()).stop();
             } else {
-                repaint();
+                repaint(); // 애니메이션이 있으면 다시 그리기
             }
         });
         this.animTimer = t;
@@ -61,9 +75,12 @@ public class BoardPanel extends JPanel {
         return new Dimension(PAD * 2 + b.cols() * CELL, PAD * 2 + b.rows() * CELL);
     }
 
+    /**
+     * 팀별 색상 반환 (테마 적용)
+     */
     private Color getTeamColor(Team team) {
         if (team == Team.SPECIAL)
-            return Color.BLACK; // [MODIFIED] 배경색 검은색
+            return Color.BLACK;
 
         if (theme == NetworkProtocol.Theme.NIGHT_MARKET) {
             if (team == Team.YELLOW)
@@ -78,6 +95,7 @@ public class BoardPanel extends JPanel {
     protected void paintComponent(Graphics raw) {
         super.paintComponent(raw);
         Graphics2D g = (Graphics2D) raw;
+        // 안티앨리어싱 설정 (부드러운 그래픽)
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 
@@ -87,6 +105,7 @@ public class BoardPanel extends JPanel {
         Font baseFont = getFont().deriveFont(Font.BOLD, baseFontSize);
         g.setFont(baseFont);
 
+        // 모든 셀 순회하며 렌더링
         for (int r = 0; r < board.rows(); r++) {
             for (int c = 0; c < board.cols(); c++) {
                 int x = PAD + c * CELL;
@@ -95,21 +114,25 @@ public class BoardPanel extends JPanel {
                 Cell cell = board.get(r, c);
                 Pos pos = new Pos(r, c);
                 FlipAnim anim = animations.get(pos);
+                
+                // 애니메이션 진행도 (0.0 ~ 1.0)
                 double progress = anim == null ? 1.0 : anim.progress();
 
-                // easing
+                // Easing 함수 적용 (부드러운 감속/가속)
                 double eased = (anim == null) ? 1.0 : 0.5 - 0.5 * Math.cos(Math.PI * progress);
 
+                // 애니메이션 전반부(0.0~0.5)는 이전 상태, 후반부(0.5~1.0)는 현재 상태 표시
                 boolean firstHalf = anim != null && progress < 0.5;
                 String token = anim != null
                         ? (firstHalf ? anim.fromToken : cell.token())
                         : cell.token();
 
+                // 색상 보간
                 Color from = anim != null ? anim.from : getTeamColor(cell.owner());
                 Color to = getTeamColor(cell.owner());
                 Color drawColor = lerpColor(from, to, eased);
 
-                // Determine which team we are currently rendering
+                // 현재 렌더링할 팀 결정
                 Team currentRenderTeam;
                 if (anim != null) {
                     currentRenderTeam = firstHalf ? anim.fromTeam : cell.owner();
@@ -117,12 +140,12 @@ public class BoardPanel extends JPanel {
                     currentRenderTeam = cell.owner();
                 }
 
+                // 3D 회전 효과 계산 (scaleX를 줄여서 회전하는 것처럼 보이게 함)
                 double angle = Math.PI * eased;
                 double scaleX = 0.3 + 0.7 * Math.abs(Math.cos(angle)); // 최소 30%까지 축소
                 double scaleY = 0.94 + 0.06 * Math.sin(angle); // 살짝 튀어나오는 느낌
 
-                // 텍스트/셀용 스케일은 위 값을 그대로 사용하고,
-                // 이미지만 별도로 스케일링하여 텍스트가 커지는 문제 해결
+                // 이미지 스케일링 별도 처리 (스페셜 아이템은 좀 더 크게)
                 double imgScaleX = scaleX;
                 double imgScaleY = scaleY;
 
@@ -136,6 +159,7 @@ public class BoardPanel extends JPanel {
                 int offsetX = x + (CELL - w) / 2;
                 int offsetY = y + (CELL - h) / 2;
 
+                // 그리기: 스페셜 아이템(이미지) vs 일반 셀(Round Rect)
                 if (currentRenderTeam == Team.SPECIAL && specialImg != null) {
                     int imgW = (int) (CELL * imgScaleX);
                     int imgH = (int) (CELL * imgScaleY);
@@ -147,41 +171,37 @@ public class BoardPanel extends JPanel {
                     g.fillRoundRect(offsetX, offsetY, w, h, 10, 10);
                 }
 
-                // [NEW] 스페셜 아이템 효과 (반짝임 + 테두리 발광)
+                // 스페셜 아이템 효과 (발광 + 반짝임)
                 if (cell.owner() == Team.SPECIAL) {
-                    drawGlowingBorder(g, offsetX, offsetY, w, h); // [NEW] 발광 효과 추가
+                    drawGlowingBorder(g, offsetX, offsetY, w, h);
                     drawSparkle(g, offsetX, offsetY, w, h);
                 }
 
-                // Use smart text fitting
+                // 텍스트 렌더링 (자동 크기 조절)
                 Layout layout = fitTextToCell(g, baseFont, token, w, h);
                 g.setFont(layout.font);
                 String drawText = layout.text;
 
                 FontMetrics fm = g.getFontMetrics();
-
                 int tw = fm.stringWidth(drawText);
                 int th = fm.getAscent();
                 int tx = offsetX + (w - tw) / 2;
-                // ascent/descent을 고려해 중앙 정렬(뒤집기 얇은 구간에서도 글자 잘림 방지)
                 int ty = offsetY + (h + th - fm.getDescent()) / 2;
 
+                // 텍스트 그림자
                 g.setColor(new Color(0, 0, 0, 110));
                 g.drawString(drawText, tx + 1, ty + 1);
 
-                // 스페셜이면 글자색을 검정이나 다른색으로? 일단 흰색 유지하되 잘보이게
-                // 스페셜이면 글자색을 흰색으로
-                if (cell.owner() == Team.SPECIAL) {
-                    g.setColor(Color.WHITE); // [MODIFIED] 글자색 흰색
-                } else {
-                    g.setColor(Color.WHITE);
-                }
+                // 텍스트 본문
+                g.setColor(Color.WHITE);
                 g.drawString(drawText, tx, ty);
                 g.setFont(baseFont);
 
+                // 격자 테두리
                 g.setColor(GRID);
                 g.drawRoundRect(x, y, CELL, CELL, 10, 10);
 
+                // 애니메이션 종료 처리
                 if (anim != null && progress >= 1.0) {
                     animations.remove(pos);
                 }
@@ -192,12 +212,15 @@ public class BoardPanel extends JPanel {
     private record Layout(Font font, String text) {
     }
 
+    /**
+     * 텍스트가 셀 안에 들어오도록 폰트 크기 조절 및 장평 조절
+     */
     private Layout fitTextToCell(Graphics2D g, Font base, String text, int cellW, int cellH) {
         int maxW = Math.max(10, cellW - 8);
         int maxH = Math.max(10, cellH - 4);
 
         Font f = base;
-        // 1. Reduce size (more aggressive, down to 6pt)
+        // 1. 폰트 크기 줄이기 (최소 11pt까지)
         while (f.getSize2D() > 11f) {
             FontMetrics fm = g.getFontMetrics(f);
             if (fm.stringWidth(text) <= maxW && fm.getHeight() <= maxH) {
@@ -206,12 +229,11 @@ public class BoardPanel extends JPanel {
             f = f.deriveFont(f.getSize2D() - 1f);
         }
 
-        // 2. Squeeze width
+        // 2. 그래도 넘치면 장평(가로 비율) 축소
         FontMetrics fm = g.getFontMetrics(f);
         int textW = fm.stringWidth(text);
         if (textW > maxW) {
             double scale = (double) maxW / textW;
-            // No limit on compression, just fit it.
             AffineTransform at = new AffineTransform();
             at.scale(scale, 1.0);
             f = f.deriveFont(at);
@@ -220,6 +242,9 @@ public class BoardPanel extends JPanel {
         return new Layout(f, text);
     }
 
+    /**
+     * 뒤집기 애니메이션 시작
+     */
     public void animateFlips(List<GameModel.FlipResult> flips) {
         long now = System.currentTimeMillis();
         for (GameModel.FlipResult f : flips) {
@@ -230,6 +255,9 @@ public class BoardPanel extends JPanel {
         }
     }
 
+    /**
+     * 색상 선형 보간 (Linear Interpolation)
+     */
     private Color lerpColor(Color a, Color b, double t) {
         t = Math.max(0, Math.min(1, t));
         int r = (int) (a.getRed() + (b.getRed() - a.getRed()) * t);
@@ -238,6 +266,9 @@ public class BoardPanel extends JPanel {
         return new Color(r, g, bl);
     }
 
+    /**
+     * 애니메이션 상태 객체
+     */
     private class FlipAnim {
         final long startMs;
         final Color from;
@@ -258,25 +289,23 @@ public class BoardPanel extends JPanel {
     }
 
     /**
-     * [NEW] 스페셜 칸 주변에 노란색 발광 효과(Glow)를 그립니다.
-     * 여러 겹의 반투명한 사각형을 겹쳐 그려서 빛이 퍼지는 느낌을 줍니다.
+     * 스페셜 아이템 발광 효과 (Glow)
+     * 반투명한 사각형을 여러 겹 그려서 빛이 퍼지는 느낌 연출
      */
     private void drawGlowingBorder(Graphics2D g, int x, int y, int w, int h) {
-        // 5단계로 투명도를 조절하며 테두리를 확장해서 그림
         for (int i = 1; i <= 5; i++) {
-            // 바깥쪽으로 갈수록 투명해짐 (Alpha: 150 -> 줄어듦)
             int alpha = Math.max(0, 150 - (i * 25));
-            g.setColor(new Color(255, 215, 0, alpha)); // Gold/Yellow 계열
-
-            // i 픽셀만큼 밖으로 확장 (Stroke를 굵게 하는 대신 drawRoundRect를 여러 번 호출)
-            // x-i, y-i 위치에서 w+2*i, h+2*i 크기로 그림
+            g.setColor(new Color(255, 215, 0, alpha)); // Gold color
             g.drawRoundRect(x - i, y - i, w + (i * 2), h + (i * 2), 14, 14);
         }
     }
 
+    /**
+     * 스페셜 아이템 반짝임 효과 (Sparkle)
+     * 시간 기반으로 회전하는 점들을 그려서 반짝이는 느낌 연출
+     */
     private void drawSparkle(Graphics2D g, int x, int y, int w, int h) {
         g.setColor(Color.YELLOW);
-        // 간단한 별 모양이나 점 찍기
         long time = System.currentTimeMillis();
         for (int i = 0; i < 3; i++) {
             double offset = (time / 150.0 + i * 2.0) % (Math.PI * 2);

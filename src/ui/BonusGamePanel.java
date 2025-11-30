@@ -7,6 +7,25 @@ import javax.imageio.ImageIO;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * 보너스 게임 애니메이션 패널
+ * 
+ * [설계 목적]
+ * - 텍스트 기반의 보너스 게임을 시각적으로 풍부하게 표현 (해적선, 사슬, 폭발 효과)
+ * - GameFrame 위에 오버레이(Overlay)되어 표시됨
+ * 
+ * [애니메이션 상태 머신]
+ * 1. IDLE: 대기 상태
+ * 2. SHIP_ENTERING: 해적선이 화면 왼쪽에서 중앙으로 등장 (Ease-out)
+ * 3. CHAINS_DROPPING: 배에서 문장이 달린 사슬이 내려옴 (각기 다른 길이)
+ * 4. ACTIVE: 플레이어 입력 대기 (사슬이 다 내려온 상태)
+ * 5. EXITING: 게임 종료 후 배가 오른쪽으로 퇴장
+ * 
+ * [주요 기능]
+ * - 파티클 시스템: 문장 정답 시 폭발 효과(불꽃) 연출
+ * - 물리 효과: 끊어진 사슬에 중력 가속도 적용하여 낙하
+ * - 스포트라이트 효과: 배경을 어둡게 처리하되 입력창 부분만 밝게 처리
+ */
 public class BonusGamePanel extends JPanel {
 
     // 애니메이션 상태 정의
@@ -34,7 +53,7 @@ public class BonusGamePanel extends JPanel {
     private List<String> sentences = new ArrayList<>();
     private boolean[] solved; // 각 문장의 해결 여부 (true면 사슬이 끊어짐)
     
-    private static final int SHIP_WIDTH = 500; // [MODIFIED] 배 크기 확대
+    private static final int SHIP_WIDTH = 500;
     private static final int SHIP_HEIGHT = 350;
     private static final int CHAIN_WIDTH = 30;
     
@@ -46,6 +65,9 @@ public class BonusGamePanel extends JPanel {
         animTimer = new Timer(16, e -> updateAnimation());
     }
     
+    /**
+     * 리소스 로딩 (파일 시스템 -> 클래스패스 순으로 시도)
+     */
     private void loadAssets() {
         try {
             shipImage = loadImage("resources/images/pirate_ship.png");
@@ -65,8 +87,10 @@ public class BonusGamePanel extends JPanel {
         }
     }
     
-    // [NEW] 폭발 효과를 위한 파티클 시스템
-    // 사슬이 끊어질 때 불꽃이 튀는 효과를 연출합니다.
+    /**
+     * 폭발 효과를 위한 파티클 클래스
+     * - 위치, 속도, 색상, 수명(life)을 가짐
+     */
     private static class Particle {
         double x, y;
         double vx, vy;
@@ -143,7 +167,7 @@ public class BonusGamePanel extends JPanel {
             if (normalizedInput.equals(normalizedTarget)) {
                 solved[i] = true;
                 
-                // [NEW] 사슬 끊김 처리 및 낙하 시작
+                // 사슬 끊김 처리 및 낙하 시작
                 isFalling[i] = true;
                 
                 // 폭발 위치 계산 (텍스트 상자 상단 연결부)
@@ -190,7 +214,7 @@ public class BonusGamePanel extends JPanel {
             }
         }
 
-        // [FIX] 끊어진 사슬은 상태와 무관하게 항상 중력 적용 (즉시 낙하)
+        // 2. 끊어진 사슬 물리 효과 (중력 낙하)
         for(int i=0; i<chainY.length; i++) {
             if(isFalling[i]) {
                 chainVelocity[i] += 1.0; // 중력 가속도
@@ -198,6 +222,7 @@ public class BonusGamePanel extends JPanel {
             }
         }
 
+        // 3. 상태별 애니메이션 로직
         if (state == State.SHIP_ENTERING) {
             // Ease-out 효과로 부드럽게 등장
             double diff = targetShipX - shipX;
@@ -210,10 +235,9 @@ public class BonusGamePanel extends JPanel {
         } else if (state == State.CHAINS_DROPPING) {
             boolean allDown = true;
             for (int i = 0; i < chainY.length; i++) {
-                // 이미 끊어진 사슬은 드롭 애니메이션에서 제외
-                if (isFalling[i]) continue;
+                if (isFalling[i]) continue; // 이미 끊어진 사슬 제외
 
-                // [MODIFIED] 사슬마다 길이를 다르게 하여 시각적 단조로움 탈피
+                // 사슬마다 길이를 다르게 하여 시각적 단조로움 탈피
                 double myTarget = targetChainY + ((i * 90) % 250);
                 
                 double diff = myTarget - chainY[i];
@@ -237,6 +261,9 @@ public class BonusGamePanel extends JPanel {
     
     private JComponent inputArea;
 
+    /**
+     * 입력창 컴포넌트 설정 (오버레이 구멍 뚫기용)
+     */
     public void setInputArea(JComponent inputArea) {
         this.inputArea = inputArea;
     }
@@ -249,7 +276,7 @@ public class BonusGamePanel extends JPanel {
         Graphics2D g2 = (Graphics2D) g;
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         
-        // [RESTORED] 배경 오버레이 그리기 (입력창 제외)
+        // [배경 오버레이]
         // 전체 화면을 어둡게 하되, 입력창 부분만 구멍을 뚫어 강조 효과를 줍니다.
         g2.setColor(new Color(0, 0, 0, 200)); 
         
@@ -269,7 +296,7 @@ public class BonusGamePanel extends JPanel {
             g2.fillRect(0, 0, getWidth(), getHeight());
         }
         
-        // 배 그리기
+        // [배 그리기]
         if (shipImage != null) {
             g2.drawImage(shipImage, (int)shipX, 10, SHIP_WIDTH, SHIP_HEIGHT, null); 
         } else {
@@ -277,15 +304,12 @@ public class BonusGamePanel extends JPanel {
             g2.fillRect((int)shipX, 10, SHIP_WIDTH, SHIP_HEIGHT);
         }
         
-        // 사슬 및 문장 상자 그리기
+        // [사슬 및 문장 상자 그리기]
         if (state != State.SHIP_ENTERING) {
             int startX = (int)shipX + 50;
             int gap = (SHIP_WIDTH - 100) / Math.max(1, sentences.size());
             
             for (int i = 0; i < sentences.size(); i++) {
-                // 이미 해결되어 떨어지고 있는 사슬은 아래 로직에서 처리됨
-                // (solved && !isFalling)인 경우는 없어야 함
-                
                 int x = startX + i * gap;
                 int y = (int)chainY[i];
                 
@@ -299,7 +323,7 @@ public class BonusGamePanel extends JPanel {
                         g2.drawLine(x, 10 + SHIP_HEIGHT/2, x, y);
                     }
                 } else {
-                    // [NEW] 끊어진 사슬 잔해 그리기 (상자에 매달린 짧은 사슬)
+                    // 끊어진 사슬 잔해 그리기 (상자에 매달린 짧은 사슬)
                      if (chainImage != null) {
                         g2.drawImage(chainImage, x - CHAIN_WIDTH/2, y - 30, CHAIN_WIDTH, 30, null);
                     }
@@ -322,7 +346,7 @@ public class BonusGamePanel extends JPanel {
             }
         }
         
-        // [NEW] 파티클(불꽃) 그리기
+        // [파티클(불꽃) 그리기]
         for(Particle p : particles) {
             g2.setColor(new Color(p.color.getRed(), p.color.getGreen(), p.color.getBlue(), (int)(p.life * 255)));
             g2.fillOval((int)p.x, (int)p.y, 6, 6);

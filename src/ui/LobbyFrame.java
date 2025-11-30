@@ -10,7 +10,17 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 
 /**
- * 메인 로비 화면. 프로필과 룸 목록을 보여준다.
+ * 게임 로비 화면 (메인 메뉴)
+ * 
+ * [설계]
+ * - 로그인 성공 후 진입하는 메인 화면
+ * - 좌측: 사용자 프로필 정보 표시
+ * - 중앙: 개설된 방 목록 표시 (JList + Custom Renderer)
+ * - 하단: 방 만들기, 참여, 싱글 플레이 버튼
+ * 
+ * [UI 특징]
+ * - 배경 이미지를 그리기 위해 커스텀 JPanel(paintComponent 오버라이딩) 사용
+ * - 반투명 패널(Alpha composite color)을 사용하여 배경이 비치도록 연출
  */
 public class LobbyFrame extends JFrame {
 
@@ -32,13 +42,14 @@ public class LobbyFrame extends JFrame {
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
         
-        // 이미지 로드
+        // 배경 이미지 로드 (실패 시 예외 처리)
         try {
             backgroundImage = new ImageIcon("resources/images/lobby_background_pirate.png").getImage();
         } catch (Exception e) {
             e.printStackTrace();
         }
 
+        // 배경 이미지를 그리는 메인 패널
         JPanel content = new JPanel(new BorderLayout(12, 12)) {
             @Override
             protected void paintComponent(Graphics g) {
@@ -51,9 +62,11 @@ public class LobbyFrame extends JFrame {
         content.setBorder(new EmptyBorder(12, 12, 12, 12));
         setContentPane(content);
 
+        // 좌측 프로필 패널, 중앙 로비 패널 배치
         content.add(buildProfilePanel(), BorderLayout.WEST);
         content.add(buildLobbyPanel(), BorderLayout.CENTER);
 
+        // 창 닫을 때 클라이언트 연결 종료
         addWindowListener(new java.awt.event.WindowAdapter() {
             @Override
             public void windowClosing(java.awt.event.WindowEvent windowEvent) {
@@ -62,6 +75,10 @@ public class LobbyFrame extends JFrame {
         });
     }
 
+    /**
+     * 좌측 프로필 패널 생성
+     * - 아바타, 닉네임, 환영 메시지 표시
+     */
     private JPanel buildProfilePanel() {
         JPanel panel = new JPanel() {
             @Override
@@ -73,8 +90,8 @@ public class LobbyFrame extends JFrame {
         };
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
         panel.setPreferredSize(new Dimension(220, 0));
-        panel.setOpaque(false); // 투명 배경 처리를 위해 false로 설정
-        panel.setBackground(new Color(26, 52, 78, 200)); // 반투명
+        panel.setOpaque(false); // 배경 그리기 위임
+        panel.setBackground(new Color(26, 52, 78, 200)); // 짙은 남색 반투명
         panel.setBorder(new EmptyBorder(20, 16, 20, 16));
 
         JLabel avatar = new JLabel(createAvatarIcon(96));
@@ -110,6 +127,10 @@ public class LobbyFrame extends JFrame {
         return panel;
     }
 
+    /**
+     * 중앙 로비 패널 생성
+     * - 방 목록 리스트, 버튼(생성/참여/싱글)
+     */
     private JPanel buildLobbyPanel() {
         JPanel panel = new JPanel(new BorderLayout(10, 10)) {
             @Override
@@ -119,10 +140,11 @@ public class LobbyFrame extends JFrame {
                 super.paintComponent(g);
             }
         };
-        panel.setOpaque(false); // 투명 배경 처리를 위해 false로 설정
-        panel.setBackground(new Color(19, 44, 68, 200)); // 반투명
+        panel.setOpaque(false);
+        panel.setBackground(new Color(19, 44, 68, 200)); // 짙은 남색 반투명
         panel.setBorder(new EmptyBorder(12, 12, 12, 12));
 
+        // 상단 헤더 (제목 + 새로고침 버튼)
         JLabel title = new JLabel("게임 로비");
         title.setForeground(Color.WHITE);
         title.setFont(title.getFont().deriveFont(Font.BOLD, 22f));
@@ -138,10 +160,13 @@ public class LobbyFrame extends JFrame {
         header.add(title, BorderLayout.WEST);
         header.add(refreshButton, BorderLayout.EAST);
 
+        // 방 목록 리스트 (JList + Custom Renderer)
         roomListModel = new DefaultListModel<>();
         roomList = new JList<>(roomListModel);
         roomList.setOpaque(false);
         roomList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        
+        // 리스트 아이템 렌더링 커스터마이징
         roomList.setCellRenderer((list, value, index, isSelected, cellHasFocus) -> {
             JPanel cell = new JPanel(new BorderLayout());
             cell.setBorder(new EmptyBorder(10, 12, 10, 12));
@@ -165,18 +190,19 @@ public class LobbyFrame extends JFrame {
         scrollPane.getViewport().setOpaque(false);
         scrollPane.setBorder(BorderFactory.createEmptyBorder());
 
+        // 하단 버튼 패널
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 4));
         buttonPanel.setOpaque(false);
         JButton createRoomBtn = new JButton("방 만들기");
         JButton joinRoomBtn = new JButton("방 참여");
-        JButton singlePlayBtn = new JButton("싱글 플레이"); // [NEW]
+        JButton singlePlayBtn = new JButton("싱글 플레이");
 
         buttonPanel.add(singlePlayBtn);
         buttonPanel.add(createRoomBtn);
         buttonPanel.add(joinRoomBtn);
 
+        // 싱글 플레이 버튼 핸들러
         singlePlayBtn.addActionListener(e -> {
-            // 난이도 선택 다이얼로그
             String[] options = {"쉬움", "보통", "어려움"};
             int choice = JOptionPane.showOptionDialog(this, "난이도를 선택하세요", "싱글 플레이",
                     JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE, null, options, options[0]);
@@ -212,6 +238,9 @@ public class LobbyFrame extends JFrame {
         return panel;
     }
 
+    /**
+     * 방 목록 전체 갱신 (서버 응답 시 호출)
+     */
     public void setRooms(java.util.List<NetworkProtocol.RoomInfo> rooms) {
         roomListModel.clear();
         for (NetworkProtocol.RoomInfo r : rooms) {
@@ -222,6 +251,9 @@ public class LobbyFrame extends JFrame {
         }
     }
 
+    /**
+     * 특정 방 정보 갱신 또는 추가 (브로드캐스트 수신 시 호출)
+     */
     public void upsertRoom(NetworkProtocol.RoomInfo room) {
         int idx = findIndex(room.name());
         if (idx >= 0) {
@@ -229,10 +261,14 @@ public class LobbyFrame extends JFrame {
         } else {
             roomListModel.addElement(room);
         }
+        // 목록이 갱신되면 마지막 항목 선택 및 스크롤
         roomList.setSelectedIndex(roomListModel.size() - 1);
         roomList.ensureIndexIsVisible(roomListModel.size() - 1);
     }
 
+    /**
+     * 방 삭제 (브로드캐스트 수신 시 호출)
+     */
     public void removeRoom(String roomName) {
         int idx = findIndex(roomName);
         if (idx >= 0) {
@@ -259,6 +295,9 @@ public class LobbyFrame extends JFrame {
         return -1;
     }
 
+    /**
+     * 간단한 아바타 아이콘 생성 (Graphics2D 드로잉)
+     */
     private Icon createAvatarIcon(int size) {
         BufferedImage img = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g2 = img.createGraphics();
