@@ -1,4 +1,5 @@
 package ui;
+
 import javax.swing.*;
 
 import client.IGameClient;
@@ -24,7 +25,8 @@ import javax.sound.sampled.LineEvent;
  * [네트워크 아키텍처]
  * - MVC 패턴: GameModel(데이터) -> GameFrame(뷰) -> GameClient(컨트롤러/네트워크)
  * - 입력 흐름: 사용자 입력 -> handleLocalInput -> GameClient.sendInputRequest -> 서버
- * - 업데이트 흐름: 서버 메시지 -> GameClient 리스너 -> handleRemote*(Tick/Input/GameOver) -> UI 갱신
+ * - 업데이트 흐름: 서버 메시지 -> GameClient 리스너 -> handleRemote*(Tick/Input/GameOver) ->
+ * UI 갱신
  * 
  * [주요 기능]
  * - 테마 지원: 생성 시 전달받은 Theme에 따라 배경, 아이콘, 색상 테마 적용
@@ -44,6 +46,8 @@ public class GameFrame extends JFrame {
     private final JLabel blueScore;
     private final JLabel timerLabel = new JLabel("01:00", SwingConstants.CENTER);
     private final Image backgroundImage;
+    private final String yellowTeamName;
+    private final String blueTeamName;
 
     // ---- 중앙 보드 ----
     private final BoardPanel boardPanel;
@@ -65,12 +69,12 @@ public class GameFrame extends JFrame {
     /**
      * 생성자: 게임 초기화 및 UI 구성
      * 
-     * @param model 초기 게임 모델 (보드 상태 포함)
-     * @param client 서버 통신용 클라이언트
-     * @param myTeam 내 팀 (입력창 활성화 여부 결정)
+     * @param model            초기 게임 모델 (보드 상태 포함)
+     * @param client           서버 통신용 클라이언트
+     * @param myTeam           내 팀 (입력창 활성화 여부 결정)
      * @param yellowPlayerName 노랑팀(왼쪽) 플레이어 이름
-     * @param bluePlayerName 파랑팀(오른쪽) 플레이어 이름
-     * @param theme 게임 테마
+     * @param bluePlayerName   파랑팀(오른쪽) 플레이어 이름
+     * @param theme            게임 테마
      */
     public GameFrame(GameModel model, IGameClient client, Team myTeam, String yellowPlayerName, String bluePlayerName,
             NetworkProtocol.Theme theme) {
@@ -85,8 +89,8 @@ public class GameFrame extends JFrame {
         String bgPath = "resources/images/game_background.png";
         Color yellowColor = new Color(0xF2, 0xC1, 0x4E);
         Color blueColor = new Color(0x5D, 0xA3, 0xFA);
-        String yellowTeamName = "노랑팀";
-        String blueTeamName = "파랑팀";
+        String yellowTeamNameLocal = "노랑팀";
+        String blueTeamNameLocal = "파랑팀";
         String yellowIconPath = "resources/images/yellow_team_pirate.png";
         String blueIconPath = "resources/images/blue_team_pirate.png";
 
@@ -95,11 +99,14 @@ public class GameFrame extends JFrame {
             bgPath = "resources/images/dark_game_background.png";
             yellowColor = new Color(147, 112, 219); // Purple
             blueColor = new Color(255, 165, 0); // Orange
-            yellowTeamName = "보라팀";
-            blueTeamName = "주황팀";
+            yellowTeamNameLocal = "보라팀";
+            blueTeamNameLocal = "주황팀";
             yellowIconPath = "resources/images/purple_team_pirate.png";
             blueIconPath = "resources/images/orange_team_pirate.png";
         }
+
+        this.yellowTeamName = yellowTeamNameLocal;
+        this.blueTeamName = blueTeamNameLocal;
 
         this.backgroundImage = loadImage(bgPath);
         this.yellowScore = scoreBadge(yellowColor);
@@ -113,7 +120,7 @@ public class GameFrame extends JFrame {
         // 2. 중앙 패널 구성 (보드)
         centerPanel.add(boardPanel, "board");
         centerPanel.setOpaque(false);
-        
+
         // 3. 보너스 게임 패널 설정 (GlassPane 사용)
         // GlassPane은 프레임의 최상위 레이어로, 아래 컴포넌트를 가리거나 투과시킬 수 있음
         setGlassPane(bonusGamePanel);
@@ -140,16 +147,17 @@ public class GameFrame extends JFrame {
         bottom.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
         JPanel inputPanel;
         if (myTeam == Team.YELLOW) {
-            inputPanel = teamInputPanel(yellowTeamName, Team.YELLOW, yellowInput, yellowBtn, yellowFlipLabel,
+            inputPanel = teamInputPanel(this.yellowTeamName, Team.YELLOW, yellowInput, yellowBtn, yellowFlipLabel,
                     yellowColor);
         } else {
-            inputPanel = teamInputPanel(blueTeamName, Team.BLUE, blueInput, blueBtn, blueFlipLabel, blueColor);
+            inputPanel = teamInputPanel(this.blueTeamName, Team.BLUE, blueInput, blueBtn, blueFlipLabel, blueColor);
         }
         // 입력창 너비를 보드 너비에 맞춤
         int desiredWidth = boardPanel.getPreferredSize().width + 40;
         inputPanel.setPreferredSize(new Dimension(desiredWidth, inputPanel.getPreferredSize().height));
         bottom.add(inputPanel);
-        // bottom.add(inputPanel); // 중복 추가 제거 (원래 코드에 있었으나 불필요해 보임, 하지만 레이아웃 균형을 위해 더미가 필요할 수도 있음. 일단 하나만 추가)
+        // bottom.add(inputPanel); // 중복 추가 제거 (원래 코드에 있었으나 불필요해 보임, 하지만 레이아웃 균형을 위해 더미가
+        // 필요할 수도 있음. 일단 하나만 추가)
         refreshFlipLabels();
 
         // 보너스 게임 패널에 입력 영역 위치 전달 (오버레이 구멍 뚫기용)
@@ -161,10 +169,10 @@ public class GameFrame extends JFrame {
         // 6. 전체 레이아웃 조립
         JPanel middle = new JPanel(new BorderLayout(8, 0));
         middle.setOpaque(false);
-        middle.add(buildSidePanel(yellowTeamName, yellowPlayerName, yellowColor, yellowTeamIcon,
+        middle.add(buildSidePanel(this.yellowTeamName, yellowPlayerName, yellowColor, yellowTeamIcon,
                 myTeam == Team.YELLOW), BorderLayout.WEST);
         middle.add(centerPanel, BorderLayout.CENTER);
-        middle.add(buildSidePanel(blueTeamName, bluePlayerName, blueColor, blueTeamIcon, myTeam == Team.BLUE),
+        middle.add(buildSidePanel(this.blueTeamName, bluePlayerName, blueColor, blueTeamIcon, myTeam == Team.BLUE),
                 BorderLayout.EAST);
 
         JPanel root = new JPanel(new BorderLayout(8, 8)) {
@@ -409,8 +417,9 @@ public class GameFrame extends JFrame {
         int y = model.getScore(Team.YELLOW);
         int b = model.getScore(Team.BLUE);
         String msg = (y == b) ? "비겼습니다!"
-                : (y > b ? "노랑팀 승리!" : "파랑팀 승리!");
-        JOptionPane.showMessageDialog(this, msg + "  (노랑 " + y + " / 파랑 " + b + ")", "게임 종료",
+                : (y > b ? yellowTeamName + " 승리!" : blueTeamName + " 승리!");
+        JOptionPane.showMessageDialog(this,
+                msg + "  (" + yellowTeamName + " " + y + " / " + blueTeamName + " " + b + ")", "게임 종료",
                 JOptionPane.INFORMATION_MESSAGE);
         client.gameHasFinished();
     }
@@ -439,7 +448,8 @@ public class GameFrame extends JFrame {
      * - 성공 시 점수 추가 및 사슬 끊기 애니메이션 트리거
      */
     public void handleBonusSentenceResult(boolean success, String sentence, Team team) {
-        System.out.println("GameFrame: Bonus Result - Success=" + success + ", Team=" + team + ", Sentence='" + sentence + "'");
+        System.out.println(
+                "GameFrame: Bonus Result - Success=" + success + ", Team=" + team + ", Sentence='" + sentence + "'");
         if (!isBonusTime) {
             return;
         }
@@ -448,10 +458,10 @@ public class GameFrame extends JFrame {
             model.addScore(team, 500);
             yellowScore.setText(model.getScore(Team.YELLOW) + "P");
             blueScore.setText(model.getScore(Team.BLUE) + "P");
-            
+
             // 사슬 끊기 효과
             bonusGamePanel.solveSentence(sentence);
-            
+
             if (team == myTeam) {
                 if (myTeam == Team.YELLOW)
                     yellowInput.setText("");
@@ -468,10 +478,10 @@ public class GameFrame extends JFrame {
     public void handleBonusTimeEnd() {
         isBonusTime = false;
         bonusGamePanel.endBonusTime();
-        
+
         // 퇴장 애니메이션 시간(약 2초) 후 패널 숨김
         Timer t = new Timer(2000, e -> {
-             bonusGamePanel.setVisible(false);
+            bonusGamePanel.setVisible(false);
         });
         t.setRepeats(false);
         t.start();
