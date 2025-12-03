@@ -1,4 +1,5 @@
 package server;
+
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -233,7 +234,8 @@ public class GameRoom {
         }
         if (playerBlue != null) {
             playerBlue.sendMessage(
-                    new NetworkProtocol.Msg_S2C_GameStart(Team.BLUE, gameModel.board(), gameModel.secondsLeft(), theme));
+                    new NetworkProtocol.Msg_S2C_GameStart(Team.BLUE, gameModel.board(), gameModel.secondsLeft(),
+                            theme));
         }
 
         System.out.println("서버: 방[" + roomName + "] 게임 시작!");
@@ -254,8 +256,8 @@ public class GameRoom {
                         startBonusTime();
                     }
 
-                    //5% 확률로 추가 점수 격자판(SPECIAL 칸) 생성
-                    if(bonusEnabled && Math.random() < 0.5){
+                    // 10% 확률로 추가 점수 격자판(SPECIAL 칸) 생성
+                    if (bonusEnabled && Math.random() < 0.1) {
                         spawnSpecialItem();
                     }
 
