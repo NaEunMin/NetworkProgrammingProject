@@ -1,4 +1,5 @@
 package game;
+
 import java.util.List;
 
 import util.WordPool;
@@ -25,13 +26,13 @@ public class GameModel {
     // 점수 (100점 단위로 증가)
     private int yellowCount;
     private int blueCount;
-    
+
     // 뒤집은 칸 수 (통계용)
     private int yellowFlips;
     private int blueFlips;
 
     private int secondsLeft;
-    private final int maxFlipPerInput;  // 한 번 입력으로 뒤집을 수 있는 최대 칸 수
+    private final int maxFlipPerInput; // 한 번 입력으로 뒤집을 수 있는 최대 칸 수
 
     public GameModel(Board board, TokenIndex index, int seconds, int maxFlipPerInput, WordPool wordPool) {
         this.board = board;
@@ -126,7 +127,7 @@ public class GameModel {
 
             cell.setOwner(newOwner);
             cell.setToken(newToken);
-            
+
             // 인덱스 업데이트 (이전 소유자 인덱스에서 제거, 새 소유자 인덱스에 추가)
             index.remove(prevOwner, oldToken, p);
             index.add(newOwner, newToken, p);
